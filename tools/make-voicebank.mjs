@@ -32,7 +32,7 @@ const VOICE = {
   pound: "ya-short", // ヒップドロップ
   // ひどい目にあう
   fall: "hah", // 落下。いちばん長く伸びる「はー」
-  hurt: "uma", // 被弾。最後に下がって消える声
+  hurt: "hah", // 被弾。「はっ！」
   dead: "uma-long", // ゲームオーバー。いちばん長い声
   // うれしい
   cheer: "ya-rise", // ゴール

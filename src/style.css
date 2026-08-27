@@ -1,0 +1,316 @@
+:root {
+  --gold: #ffd23f;
+  --ink: #10201c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #06251f;
+  font-family: "Trebuchet MS", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  color: #fff;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#view {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* 低解像度レンダリングをドット感を保ったまま引き伸ばす */
+  image-rendering: pixelated;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ---------- HUD ---------- */
+.hud {
+  position: absolute;
+  inset: 10px 12px auto 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+.hud-life {
+  display: flex;
+  gap: 5px;
+}
+
+.heart {
+  width: 22px;
+  height: 20px;
+  background: #ff5069;
+  clip-path: path(
+    "M11 20 C 2 13, 0 8, 0 5.5 C 0 2, 2.5 0, 5.5 0 C 8 0, 10 1.6, 11 3.4 C 12 1.6, 14 0, 16.5 0 C 19.5 0, 22 2, 22 5.5 C 22 8, 20 13, 11 20 Z"
+  );
+  filter: drop-shadow(1px 2px 0 rgba(0, 0, 0, 0.5));
+}
+
+.heart.empty {
+  background: #4b5b57;
+}
+
+.hud-coins {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 30px;
+  font-weight: 900;
+  color: var(--gold);
+  letter-spacing: 1px;
+}
+
+.hud-coins .x {
+  color: #dcdcf0;
+  font-size: 22px;
+}
+
+.hud-coins .of {
+  font-size: 14px;
+  color: #cfd8d5;
+  margin-left: 2px;
+  align-self: flex-end;
+  padding-bottom: 5px;
+}
+
+.coin-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6bf, #ffc21a 60%, #b5810b);
+  box-shadow: inset 0 0 0 3px #e0a500;
+}
+
+.hud-right {
+  text-align: right;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+#timer {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+#sound {
+  font-size: 12px;
+  opacity: 0.85;
+  letter-spacing: 0.05em;
+}
+
+#sound.off {
+  opacity: 0.45;
+}
+
+.toast {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  transform: translate(-50%, -8px);
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(8, 40, 34, 0.85);
+  border: 2px solid var(--gold);
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* ---------- 各種スクリーン ---------- */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3, 18, 15, 0.72);
+  pointer-events: auto;
+  padding: 16px;
+}
+
+.screen.hidden {
+  display: none;
+}
+
+.panel {
+  width: min(520px, 92vw);
+  max-height: 92vh;
+  overflow: auto;
+  background: linear-gradient(180deg, #0f3b32, #082a24);
+  border: 3px solid var(--gold);
+  border-radius: 18px;
+  padding: 22px 24px 26px;
+  text-align: center;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+.panel h1 {
+  margin: 4px 0 2px;
+  font-size: clamp(24px, 5.2vw, 36px);
+  color: var(--gold);
+  text-shadow: 3px 3px 0 #052019;
+}
+
+.panel h2 {
+  margin: 6px 0 10px;
+  font-size: clamp(22px, 5vw, 32px);
+  color: var(--gold);
+}
+
+.panel .sub {
+  margin: 0 0 14px;
+  color: #bfe6da;
+}
+
+.keys {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.keys b {
+  color: var(--gold);
+}
+
+.btn {
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 13px 34px;
+  margin: 6px;
+  font-size: 18px;
+  font-weight: 800;
+  font-family: inherit;
+  color: #10201c;
+  background: linear-gradient(180deg, #ffe27a, #f0b200);
+  box-shadow: 0 4px 0 #a97b00;
+  cursor: pointer;
+}
+
+.btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #a97b00;
+}
+
+.btn.ghost {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+}
+
+.note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #9fc7bd;
+}
+
+/* ---------- タッチ操作 ---------- */
+.touch-ui {
+  position: absolute;
+  inset: 0;
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .touch-ui {
+    display: block;
+  }
+}
+
+.stick-zone {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 45%;
+  height: 55%;
+  pointer-events: auto;
+}
+
+.stick-base {
+  position: fixed;
+  width: 108px;
+  height: 108px;
+  margin: -54px 0 0 -54px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.btn-zone {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 52%;
+  height: 58%;
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 0 18px 26px 0;
+}
+
+.tbtn {
+  pointer-events: auto;
+  border: 3px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  width: 92px;
+  height: 92px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  color: #10201c;
+  background: rgba(255, 226, 122, 0.85);
+}
+
+.tbtn-crouch {
+  width: 76px;
+  height: 76px;
+  background: rgba(180, 220, 255, 0.8);
+}
+
+.tbtn:active {
+  transform: scale(0.94);
+}

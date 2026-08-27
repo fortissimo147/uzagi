@@ -186,9 +186,12 @@ for (const [name, uri] of Object.entries(VOICEBANK)) {
   // ここは「その用途に耐える範囲か」だけを見る。
   if (name === "fall")
     check(`${name}: 落ちるあいだ持つ長さがある`, w.seconds >= 0.6, `${w.seconds.toFixed(2)}秒`);
-  // 跳ぶ・蹴る・踏むは連打されるので、次の一声までに終わっていること
-  if (["wa", "ya", "kick", "stomp", "pound"].includes(name))
+  // 蹴る・踏むは連打されるので、次の一声までに終わっていること
+  if (["ya", "kick", "stomp", "pound"].includes(name))
     check(`${name}: 0.45秒以内`, w.seconds <= 0.45, `${w.seconds.toFixed(2)}秒`);
+  // ジャンプ（wa）は「やは」と続けて言った録音そのものなので他より長い。
+  // 素早く連打すると重なりうるが、そこは声の中身を優先した。
+  if (name === "wa") check(`${name}: 1秒以内`, w.seconds <= 1, `${w.seconds.toFixed(2)}秒`);
   // 被弾は連続で食らっても重ならない程度に
   if (name === "hurt") check(`${name}: 0.7秒以内`, w.seconds <= 0.7, `${w.seconds.toFixed(2)}秒`);
 }

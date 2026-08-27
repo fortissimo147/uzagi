@@ -22,7 +22,7 @@ const OUT = path.join(ROOT, "src", "voicebank.js");
 // 同じ録音を何度書いても、埋め込みは1回だけなので容量は増えない。
 const VOICE = {
   // 跳ぶ
-  wa: "ya-short", // ジャンプ「や」
+  wa: "yaha", // ジャンプ。「やは」と続けて言った録音そのもの
   ya: "ha-rise", // 2段ジャンプ「は」… 続けて跳ぶと「や→は」になる
   wahoo: "ya-rise", // 3段ジャンプ。上がって張る声
   hup: "ha", // 幅跳び

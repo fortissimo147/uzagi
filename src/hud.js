@@ -16,8 +16,8 @@ export class Hud {
           <p class="sub">3D Action &mdash; three stages, each ending at the pipe on top</p>
           <ul class="keys">
             <li><b>WASD / Arrow keys</b> Move</li>
-            <li><b>Space</b> Jump (tap again for double and triple jumps)</li>
-            <li><b>Shift</b> Crouch &mdash; running + Space for a long jump</li>
+            <li><b>Space</b> Jump &mdash; land and tap again at once for a higher double / triple jump</li>
+            <li><b>Shift</b> Crouch &mdash; run, then Shift + Space for a long jump</li>
             <li><b>Shift in mid-air</b> Ground pound</li>
             <li><b>Space against a wall</b> Wall kick</li>
             <li><b>Drag / Q &amp; E</b> Turn camera &nbsp; <b>P</b> Pause &nbsp; <b>M</b> Sound</li>

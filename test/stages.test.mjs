@@ -222,18 +222,13 @@ try {
   );
   check("通しの得点が入っている", run.score > 0, `score=${run.score}`);
 
-  // 土管の当たり判定は四角なので、真ん中でなく角のほうに乗ることがある。
-  // そこでもクリアになること（中心からの距離だけで見ていると取りこぼす）。
-  section(`${stageCount + 2}. 土管の端に乗ってもクリアになる`);
-  for (const [dx, dz] of [
-    [1.5, 1.5],
-    [-1.5, 1.5],
-    [1.5, -1.5],
-    [-1.5, -1.5],
-  ]) {
+  // 土管は「真ん中の黒い穴」に触れたときだけクリアにする。
+  // 緑のふちに乗っただけでは入らないこと、穴の上なら入ることの両方を見る。
+  section(`${stageCount + 2}. 土管は黒い穴だけで入る`);
+  const tryAt = async (dx, dz) => {
     await page.evaluate(() => window.__game.startRun());
     await page.waitForTimeout(700);
-    const got = await page.evaluate(
+    return page.evaluate(
       async ([ox, oz]) => {
         const g = window.__game;
         g.player.invuln = 99;
@@ -243,11 +238,40 @@ try {
         g.player.pos.y += 0.1;
         g.player.vel.set(0, 0, 0);
         await new Promise((r) => setTimeout(r, 1200));
-        return { state: g.state, y: g.player.pos.y };
+        return { state: g.state, hole: g.level.goal.holeRadius };
       },
       [dx, dz]
     );
-    check(`角 (${dx}, ${dz}) に乗ってもクリアになる`, got.state === "clear", JSON.stringify(got));
+  };
+
+  // 穴の中（黒い所）→ 入る
+  for (const [dx, dz] of [
+    [0, 0],
+    [1.0, 0],
+    [0, -1.0],
+    [0.7, 0.7],
+  ]) {
+    const got = await tryAt(dx, dz);
+    check(
+      `穴の上 (${dx}, ${dz}) は入る`,
+      got.state === "clear",
+      `中心から ${Math.hypot(dx, dz).toFixed(2)} / 穴の半径 ${got.hole} — ${got.state}`
+    );
+  }
+
+  // ふちの上（緑の所）→ 入らない
+  for (const [dx, dz] of [
+    [1.6, 0],
+    [0, 1.6],
+    [1.5, 1.5],
+    [-1.5, -1.5],
+  ]) {
+    const got = await tryAt(dx, dz);
+    check(
+      `ふちの上 (${dx}, ${dz}) は入らない`,
+      got.state !== "clear",
+      `中心から ${Math.hypot(dx, dz).toFixed(2)} / 穴の半径 ${got.hole} — ${got.state}`
+    );
   }
 
   await page.evaluate(() => window.__game.startRun());

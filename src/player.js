@@ -33,6 +33,9 @@ export class Player {
     this.facing = 0; // モデルの向き（ラジアン）
     this.jumpCombo = 0;
     this.comboTimer = 0;
+    this.crouchLatch = false; // 跳ぶ瞬間にしゃがみを押していたか
+    this.runSpeed = 0; // しゃがむ直前の走りの速さ（幅跳びの判定に使う）
+    this.runSpeedTimer = 0;
     this.coyote = 0;
     this.jumpBuffer = 0;
     this.pounding = 0; // 0:なし 1:溜め 2:落下
@@ -141,8 +144,12 @@ export class Player {
       input = null;
     }
     if (this.invuln > 0) this.invuln -= dt;
+    // 連続ジャンプの段数。comboTimer は着地したときだけ立つので、
+    // 「タイマーが切れている」だけで段数を捨てると、空中にいるあいだに
+    // 毎フレーム0へ戻ってしまい、次に跳んでも永遠に1段目にしかならない。
+    // 段数を捨てるのは、地面にいて次の入力を待つ窓が閉じたときだけにする。
     if (this.comboTimer > 0) this.comboTimer -= dt;
-    else this.jumpCombo = 0;
+    else if (this.grounded) this.jumpCombo = 0;
 
     // カメラ基準の入力ベクトル
     let mx = 0;
@@ -157,6 +164,21 @@ export class Player {
     const inputLen = Math.hypot(mx, mz);
     const crouch = input ? input.crouchHeld : false;
     this.jumpHeldNow = input ? input.jumpHeld : false;
+    if (!crouch) this.crouchLatch = false;
+
+    // 幅跳びの判定に使う「しゃがむ直前の走りの速さ」。しゃがむと接地中の速さは
+    // 次のフレームには 3.6 まで落ちるので、跳ぶ瞬間の速さで「5より速いか」を
+    // 見ると条件を満たせず、走ってしゃがんで跳んでもただのジャンプになる。
+    // そこで、しゃがむ直前の速さを 0.35 秒だけ覚えておいてそちらで判定する。
+    if (!crouch) {
+      this.runSpeed = Math.hypot(this.vel.x, this.vel.z);
+      this.runSpeedTimer = 0.35;
+    } else if (this.runSpeedTimer > 0) {
+      this.runSpeedTimer -= dt;
+    } else {
+      this.runSpeed = Math.hypot(this.vel.x, this.vel.z);
+    }
+    const runSpeed = this.runSpeed;
 
     // --- ヒップドロップ ---
     if (this.pounding === 1) {
@@ -210,19 +232,22 @@ export class Player {
       if (this.coyote > 0) {
         this.jumpBuffer = 0;
         this.coyote = 0;
-        if (crouch && speed > 5) {
+        if (crouch && runSpeed > 5) {
           // 幅跳び
           this.longJumping = true;
           this.vel.y = 10.5;
-          const dirX = this.vel.x / speed;
-          const dirZ = this.vel.z / speed;
+          const s = speed > 1e-4 ? speed : runSpeed;
+          const dirX = this.vel.x / s;
+          const dirZ = this.vel.z / s;
           this.vel.x = dirX * 17;
           this.vel.z = dirZ * 17;
           this.jumpCombo = 0;
           sfx.doubleJump();
           cry.hup();
         } else {
-          this.jumpCombo = this.comboTimer > 0 ? Math.min(3, this.jumpCombo + 1) : 1;
+          // 3段まで上がったら次は1段目に戻す（3段が延々と続かないように）
+          this.jumpCombo =
+            this.comboTimer > 0 && this.jumpCombo < 3 ? this.jumpCombo + 1 : 1;
           this.vel.y = [0, JUMP1, JUMP2, JUMP3][this.jumpCombo];
           if (this.jumpCombo === 3) {
             this.spin = 0.001;
@@ -238,6 +263,9 @@ export class Player {
         }
         this.grounded = false;
         this.squash = 1.35;
+        // 跳ぶ瞬間にしゃがみを押しっぱなしだったか。押しっぱなしのまま
+        // 跳ぶと、下の判定がその場でヒップドロップに変えてしまうので覚えておく。
+        this.crouchLatch = crouch;
       } else if (this.wallTimer > 0 && !this.longJumping) {
         // 壁キック
         this.jumpBuffer = 0;
@@ -258,8 +286,16 @@ export class Player {
     if (input && !input.jumpHeld && this.vel.y > 4 && this.pounding === 0)
       this.vel.y -= 26 * dt;
 
-    // 空中でしゃがみ＝ヒップドロップ
-    if (input && crouch && !this.grounded && this.pounding === 0 && !this.longJumping) {
+    // 空中でしゃがみ＝ヒップドロップ。ただし跳ぶ前から押しっぱなしのものは数えない
+    // （しゃがんだまま跳ぶと、跳んだ端から叩きつけになって跳べなくなるため）。
+    if (
+      input &&
+      crouch &&
+      !this.crouchLatch &&
+      !this.grounded &&
+      this.pounding === 0 &&
+      !this.longJumping
+    ) {
       this.pounding = 1;
       this.poundTimer = 0.18;
       sfx.pound();

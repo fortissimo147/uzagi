@@ -389,6 +389,84 @@ try {
   check("奈落へ落ちると悲鳴が出る", scream.onPlunge);
   check("復帰したら悲鳴が止まる", !scream.afterRespawn);
 
+  // ================= ジャンプの段数と幅跳び =================
+  // どちらも一度壊れていた。段数は「空中にいるあいだ毎フレーム0に戻る」ため
+  // 2段・3段に上がらず、幅跳びは「しゃがむと速さが3.6に落ちてから
+  // 5より速いかを見ていた」ため成立しなかった。機械で見張る。
+  section("7.5 ジャンプの段数と幅跳び");
+  const jumpProbe = await page.evaluate(async () => {
+    const g = window.__game;
+    const p = g.player;
+    const i = g.input;
+    const frame = () => new Promise((r) => requestAnimationFrame(r));
+    const settle = async () => {
+      p.pos.set(0, 0.2, 0);
+      p.vel.set(0, 0, 0);
+      p.jumpCombo = 0;
+      p.comboTimer = 0;
+      p.longJumping = false;
+      p.pounding = 0;
+      p.crouchLatch = false;
+      for (let k = 0; k < 60 && !p.grounded; k++) await frame();
+    };
+
+    // 着地した次のフレームに跳ぶのを3回。段数が 1→2→3 と上がるはず。
+    await settle();
+    const combos = [];
+    for (let n = 0; n < 3; n++) {
+      for (let k = 0; k < 200 && !p.grounded; k++) await frame();
+      i.touchJumpEdge = true;
+      await frame();
+      await frame();
+      combos.push(p.jumpCombo);
+    }
+
+    // 走ってからしゃがみ＋ジャンプ＝幅跳び
+    await settle();
+    i.stick.active = true;
+    i.stick.x = 0;
+    i.stick.y = -1;
+    for (let k = 0; k < 60; k++) await frame(); // 最高速まで走る
+    const before = Math.hypot(p.vel.x, p.vel.z);
+    i.touchCrouch = true;
+    await frame();
+    i.touchJumpEdge = true;
+    await frame();
+    await frame();
+    const lj = { longJumping: p.longJumping, pounding: p.pounding, speed: Math.hypot(p.vel.x, p.vel.z) };
+    i.touchCrouch = false;
+    i.stick.active = false;
+    i.stick.x = i.stick.y = 0;
+
+    // しゃがみを押しっぱなしで跳んでも、その場で叩きつけにならないこと
+    await settle();
+    i.touchCrouch = true;
+    await frame();
+    i.touchJumpEdge = true;
+    await frame();
+    await frame();
+    const held = { pounding: p.pounding, vy: p.vel.y };
+    i.touchCrouch = false;
+
+    return { combos, before, lj, held };
+  });
+
+  check(
+    "続けて跳ぶと段数が 1→2→3 と上がる",
+    jumpProbe.combos.join(",") === "1,2,3",
+    jumpProbe.combos.join(" → ")
+  );
+  check(
+    "走ってしゃがみ＋ジャンプで幅跳びになる",
+    jumpProbe.lj.longJumping && jumpProbe.lj.speed > 12,
+    `走り出しの速さ ${jumpProbe.before.toFixed(1)} → ${JSON.stringify(jumpProbe.lj)}`
+  );
+  check(
+    "しゃがんだまま跳んでも即ヒップドロップにならない",
+    jumpProbe.held.pounding === 0 && jumpProbe.held.vy > 0,
+    JSON.stringify(jumpProbe.held)
+  );
+
   // ================= 区間の到達性（オートパイロット） =================
   section("8. 各区間をジャンプで越えられる");
   await installAutopilot(page);

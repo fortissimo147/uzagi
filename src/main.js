@@ -375,18 +375,13 @@ class Game {
       return;
     }
 
-    // ゴール判定。土管の上に乗れたらクリアでいい。
-    //
-    // 土管の当たり判定は四角（±1.7）なのに、ここを中心からの距離 1.9 で
-    // 見ていたので、角のほうに乗ると（中心から最大 2.4 離れる）足は着いて
-    // いるのにクリアにならなかった。乗っている床が土管かどうかを直接見て、
-    // そのうえで「ふちに触れている」場合も拾うようにする。
+    // ゴール判定。土管の真ん中の「黒い穴」に触れたら入ったことにする。
+    // ふち（緑の縁）に乗っただけでは入らない。判定の輪は穴を描いている
+    // 半径そのもの（level.js の HOLE_R）なので、画面で黒く見えている所を
+    // 踏めば必ず入り、緑のふちに立っているあいだは入らない。
     const g = this.level.goal;
-    const onPipe = p.grounded && p.ground?.tag === "pipe";
-    const nearPipe =
-      Math.hypot(p.pos.x - g.pos.x, p.pos.z - g.pos.z) < 2.7 &&
-      Math.abs(p.pos.y - g.pos.y) < 1.8;
-    if (onPipe || nearPipe) {
+    const overHole = Math.hypot(p.pos.x - g.pos.x, p.pos.z - g.pos.z) < g.holeRadius;
+    if (overHole && Math.abs(p.pos.y - g.pos.y) < 1.2) {
       this.state = "clear";
       this.clearTimer = 0;
       this.clearShown = false;

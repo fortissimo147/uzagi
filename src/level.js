@@ -294,8 +294,13 @@ export function buildLevel(scene, world, stageIndex = 0) {
     return mesh;
   }
 
-  /** ゴールの土管。baseY は土管の足元＝台の上面。 */
+  /**
+   * ゴールの土管。baseY は土管の足元＝台の上面。
+   * 入ったことにするのは真ん中の黒い穴に触れたときだけ。見た目の穴と判定を
+   * 同じ数（HOLE_R）から作るので、画面で黒い所を踏めば必ず入る。
+   */
   function goalPipe(cx, baseY, cz) {
+    const HOLE_R = 1.5; // 黒い穴の半径
     const pipe = new THREE.Group();
     const barrel = new THREE.Mesh(
       new THREE.CylinderGeometry(1.6, 1.6, 2.2, 12),
@@ -309,7 +314,7 @@ export function buildLevel(scene, world, stageIndex = 0) {
     );
     lip.position.y = 2.25;
     pipe.add(lip);
-    const hole = new THREE.Mesh(new THREE.CircleGeometry(1.5, 12), flat(0x0c2a0c));
+    const hole = new THREE.Mesh(new THREE.CircleGeometry(HOLE_R, 12), flat(0x0c2a0c));
     hole.rotation.x = -Math.PI / 2;
     hole.position.y = 2.61;
     pipe.add(hole);
@@ -321,8 +326,8 @@ export function buildLevel(scene, world, stageIndex = 0) {
     });
     level.goal = {
       object: pipe,
-      pos: new THREE.Vector3(cx, baseY + 2.5, cz),
-      radius: 2.2,
+      pos: new THREE.Vector3(cx, baseY + 2.5, cz), // 穴の中心（土管の上面）
+      holeRadius: HOLE_R,
     };
     return pipe;
   }

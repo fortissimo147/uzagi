@@ -7,13 +7,13 @@ export class Hud {
       <div class="hud">
         <div class="hud-life" id="life"></div>
         <div class="hud-coins"><span class="coin-icon"></span><span class="x">×</span><span id="coinCount">0</span><span class="of" id="coinTotal"></span></div>
-        <div class="hud-right"><div id="area">Start Plaza</div><div id="timer">0:00</div><div id="sound">♪ ON</div></div>
+        <div class="hud-right"><div id="stage">Stage 1/3</div><div id="area">Start Plaza</div><div id="timer">0:00</div><div id="sound">♪ ON</div></div>
       </div>
       <div class="toast" id="toast"></div>
       <div class="screen" id="screenTitle">
         <div class="panel">
           <h1>Tower of Green Pillars</h1>
-          <p class="sub">3D Action &mdash; climb to the pipe at the summit</p>
+          <p class="sub">3D Action &mdash; three stages, each ending at the pipe on top</p>
           <ul class="keys">
             <li><b>WASD / Arrow keys</b> Move</li>
             <li><b>Space</b> Jump (tap again for double and triple jumps)</li>
@@ -40,9 +40,16 @@ export class Hud {
           <button class="btn" id="btnRetry">Try Again</button>
         </div>
       </div>
+      <div class="screen hidden" id="screenStage">
+        <div class="panel clear">
+          <h2 id="stageTitle">Stage Clear!</h2>
+          <p id="stageStat"></p>
+          <button class="btn" id="btnNext">Next Stage</button>
+        </div>
+      </div>
       <div class="screen hidden" id="screenClear">
         <div class="panel clear">
-          <h2>Stage Clear!</h2>
+          <h2>All Stages Clear!</h2>
           <p id="clearStat"></p>
           <button class="btn" id="btnAgain">Play Again</button>
         </div>
@@ -52,6 +59,7 @@ export class Hud {
     this.coinCount = root.querySelector("#coinCount");
     this.coinTotal = root.querySelector("#coinTotal");
     this.area = root.querySelector("#area");
+    this.stage = root.querySelector("#stage");
     this.timer = root.querySelector("#timer");
     this.toastEl = root.querySelector("#toast");
     this.sound = root.querySelector("#sound");
@@ -60,6 +68,7 @@ export class Hud {
       pause: root.querySelector("#screenPause"),
       over: root.querySelector("#screenOver"),
       clear: root.querySelector("#screenClear"),
+      stage: root.querySelector("#screenStage"),
     };
     this._hp = -1;
   }
@@ -88,6 +97,10 @@ export class Hud {
     this.area.textContent = name;
   }
 
+  setStage(n, total, name) {
+    this.stage.textContent = `Stage ${n}/${total} \u00b7 ${name}`;
+  }
+
   setMuted(muted) {
     this.sound.textContent = muted ? "♪ OFF" : "♪ ON";
     this.sound.classList.toggle("off", muted);
@@ -113,6 +126,13 @@ export class Hud {
 
   hideAll() {
     for (const el of Object.values(this.screens)) el.classList.add("hidden");
+  }
+
+  // 面クリア（まだ先がある）。次に何が来るかまで出す。
+  setStageResult(n, name, coins, total, score, nextName) {
+    this.root.querySelector("#stageTitle").textContent = `Stage ${n} Clear! \u2014 ${name}`;
+    this.root.querySelector("#stageStat").innerHTML =
+      `Coins ${coins} / ${total} &nbsp; Score ${score}<br>Next: ${nextName}`;
   }
 
   setResult(id, coins, total, time, score) {

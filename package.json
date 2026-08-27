@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node test/physics.test.mjs && node test/audio.test.mjs && node test/play.test.mjs",
+    "test": "node test/physics.test.mjs && node test/audio.test.mjs && node test/play.test.mjs && node test/stages.test.mjs",
     "standalone": "vite build && node tools/standalone.mjs",
     "voicebank": "node tools/make-voicebank.mjs"
   },

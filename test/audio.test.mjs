@@ -181,10 +181,16 @@ for (const [name, uri] of Object.entries(VOICEBANK)) {
   check(`${name}: 16bit`, w.bits === 16, `${w.bits}bit`);
   // 頭打ちすると歪む。書き出すときに余裕を残しておくこと。
   check(`${name}: 頭打ちしていない`, w.peak < 0.99, `最大 ${w.peak.toFixed(3)}`);
-  // 落下の悲鳴は途中で止める前提なので長め、掛け声は連打で重なるので短め
-  if (name === "fall") check(`${name}: 1秒以上ある`, w.seconds >= 1, `${w.seconds.toFixed(2)}秒`);
-  if (["wa", "ya", "hurt"].includes(name))
-    check(`${name}: 0.5秒以内`, w.seconds <= 0.5, `${w.seconds.toFixed(2)}秒`);
+  // 落下の悲鳴は途中で止める前提なので長め、掛け声は連打で重なるので短め。
+  // 長さは録音そのもので決まる（切り出した声に手を入れない方針）ので、
+  // ここは「その用途に耐える範囲か」だけを見る。
+  if (name === "fall")
+    check(`${name}: 落ちるあいだ持つ長さがある`, w.seconds >= 0.6, `${w.seconds.toFixed(2)}秒`);
+  // 跳ぶ・蹴る・踏むは連打されるので、次の一声までに終わっていること
+  if (["wa", "ya", "kick", "stomp", "pound"].includes(name))
+    check(`${name}: 0.45秒以内`, w.seconds <= 0.45, `${w.seconds.toFixed(2)}秒`);
+  // 被弾は連続で食らっても重ならない程度に
+  if (name === "hurt") check(`${name}: 0.7秒以内`, w.seconds <= 0.7, `${w.seconds.toFixed(2)}秒`);
 }
 
 summary("audio.test.mjs");

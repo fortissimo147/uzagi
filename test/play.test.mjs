@@ -9,6 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { check, near, section, summary } from "./harness.mjs";
+import { installAutopilot, runSegments } from "./autopilot.mjs";
 import { VOICEBANK } from "../src/voicebank.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -104,6 +105,8 @@ const probe = () =>
       coins: g.coins,
       total: g.level.totalCoins,
       enemies: g.level.enemies.length,
+      stage: g.stageIndex + 1,
+      stageName: g.level.stage.name,
       fps: g.fps,
     };
   });
@@ -388,49 +391,7 @@ try {
 
   // ================= 区間の到達性（オートパイロット） =================
   section("8. 各区間をジャンプで越えられる");
-  await page.evaluate(() => {
-    // 目標へ走り、崖の縁または段差の手前でジャンプする簡易AI
-    window.__auto = async (tx, ty, tz, seconds) => {
-      const g = window.__game;
-      const p = g.player;
-      const i = g.input;
-      i.stick.active = true;
-      i.touchJump = true;
-      // 実時間ではなくゲーム内時間（g.time）で数える。描画が重い環境でも
-      // 「ゲーム内で何秒ぶん動かしたか」が変わらないようにするため。
-      // ただし落下などで g.time が止まったまま抜けられなくなるので、
-      // 実時間の上限も併せて持たせておく。
-      const t0 = g.time;
-      const wall0 = performance.now();
-      let best = Infinity;
-      let lastJump = -1;
-      while (g.time - t0 < seconds && performance.now() - wall0 < seconds * 4000) {
-        const now = g.time;
-        const dx = tx - p.pos.x;
-        const dz = tz - p.pos.z;
-        const d = Math.hypot(dx, dz);
-        best = Math.min(best, Math.hypot(dx, ty - p.pos.y, dz));
-        g.camera3.yaw = Math.atan2(-dx, -dz);
-        i.stick.x = 0;
-        i.stick.y = d < 1.6 ? 0 : -1;
-        const needUp = ty > p.pos.y + 0.5;
-        const fx = dx / (d || 1);
-        const fz = dz / (d || 1);
-        const ahead = g.world.groundAt(p.pos.x + fx * 1.5, p.pos.z + fz * 1.5, p.pos.y + 0.5, 0.2);
-        const gap = !isFinite(ahead.y) || ahead.y < p.pos.y - 1;
-        if (p.grounded && now - lastJump > 0.5 && (gap || (needUp && d < 3) || (!needUp && d > 1.6 && d < 2.4))) {
-          i.touchJumpEdge = true;
-          lastJump = now;
-        }
-        await new Promise((r) => requestAnimationFrame(r));
-        if (d < 1.6 && Math.abs(p.pos.y - ty) < 1.2 && p.grounded) break;
-      }
-      i.stick.active = false;
-      i.stick.x = i.stick.y = 0;
-      i.touchJump = false;
-      return { x: p.pos.x, y: p.pos.y, z: p.pos.z, best: +best.toFixed(2) };
-    };
-  });
+  await installAutopilot(page);
 
   const segments = [
     ["石の坂 → 石の広場", [0, 0.2, -5], [[0, 0.2, 6], [0, 5, 26]], 14],
@@ -439,52 +400,33 @@ try {
     ["鉄の回廊 → チェッカー3段目", [-9, 24.2, -11], [[-9, 26, -21], [-4, 28, -25], [2, 30, -23]], 22],
     ["最上段 → てっぺん", [9, 32.2, -18.5], [[16, 34, -12], [12, 34, -8]], 14],
   ];
-  for (const [name, from, waypoints, secs] of segments) {
-    await page.evaluate(
-      ([f]) => {
-        const g = window.__game;
-        g.state = "play";
-        g.hud.hideAll();
-        g.player.pos.set(f[0], f[1], f[2]);
-        g.player.checkpoint.set(f[0], f[1], f[2]); // 失敗しても同じ区間をやり直す
-        g.player.vel.set(0, 0, 0);
-        g.player.hp = 3;
-        g.player.dead = false;
-        g.player.invuln = 999; // 到達性だけを見たいので無敵
-        g.camera3.reset(g.player);
-      },
-      [from]
-    );
-    await page.waitForTimeout(400);
-    let last = null;
-    for (const w of waypoints)
-      last = await page.evaluate((a) => window.__auto(a[0], a[1], a[2], a[3]), [...w, secs]);
-    const t = waypoints[waypoints.length - 1];
-    const reached =
-      (Math.hypot(last.x - t[0], last.z - t[2]) < 3 && Math.abs(last.y - t[1]) < 2.6) ||
-      last.best < 2.2;
-    check(
-      `${name} を自動操作で越えられる`,
-      reached,
-      `到達 (${last.x.toFixed(1)}, ${last.y.toFixed(1)}, ${last.z.toFixed(1)}) 最接近 ${last.best}`
-    );
-  }
+  await runSegments(page, segments);
 
   // ================= ゴール =================
-  section("9. ゴールとクリア");
-  await page.evaluate(() => {
-    const g = window.__game;
-    g.player.invuln = 9;
-    g.player.pos.copy(g.level.goal.pos).y += 0.1;
-    g.player.vel.set(0, 0, 0);
-  });
+  section("9. ゴールと次の面へ");
+  const toGoal = () =>
+    page.evaluate(() => {
+      const g = window.__game;
+      g.player.invuln = 9;
+      g.player.pos.copy(g.level.goal.pos).y += 0.1;
+      g.player.vel.set(0, 0, 0);
+    });
+  await toGoal();
   await page.waitForTimeout(2600);
   check("土管に乗るとクリアになる", (await probe()).state === "clear");
-  check("クリア画面が出る", await page.isVisible("#screenClear"));
+  check("次の面の入口が出る", await page.isVisible("#screenStage"));
+  // まだ先があるので、通しのクリア画面はここでは出ない
+  check("総合クリアはまだ出ない", !(await page.isVisible("#screenClear")));
+
+  await page.click("#btnNext");
+  await page.waitForTimeout(900);
+  const st2 = await probe();
+  check("2面が始まる", st2.state === "play" && st2.stage === 2, JSON.stringify(st2));
+  check("2面はライフが満タンに戻る", st2.hp === 3, `hp=${st2.hp}`);
 
   // ================= ポーズ・リトライ =================
   section("10. ポーズとリトライ");
-  await page.click("#btnAgain");
+  await page.evaluate(() => window.__game.startRun());
   await page.waitForTimeout(900);
   const restarted = await probe();
   check("リトライで最初から始まる", restarted.state === "play" && restarted.coins === 0 && restarted.hp === 3, JSON.stringify(restarted));

@@ -1,7 +1,7 @@
 // ゲーム本体。状態管理・毎フレームの更新・描画。
 import * as THREE from "three";
 import { World } from "./physics.js";
-import { buildLevel } from "./level.js";
+import { buildLevel, stageInfo } from "./level.js";
 import { Player } from "./player.js";
 import { FollowCamera } from "./camera.js";
 import { Input } from "./input.js";
@@ -43,6 +43,8 @@ class Game {
     this.time = 0;
     this.score = 0;
     this.coins = 0;
+    this.pastCoins = 0;    // 前の面までに取ったコイン
+    this.pastCoinsMax = 0; // 前の面までに置いてあったコイン
     this.particles = [];
 
     this.buildStage();
@@ -61,6 +63,7 @@ class Game {
     this.hud.on("#btnRestart", () => this.startRun());
     this.hud.on("#btnRetry", () => this.startRun());
     this.hud.on("#btnAgain", () => this.startRun());
+    this.hud.on("#btnNext", () => this.nextStage());
 
     addEventListener("resize", () => this.resize());
     this.resize();
@@ -71,20 +74,11 @@ class Game {
   }
 
   // ---------- ステージの生成・破棄 ----------
-  buildStage() {
+  // 空の色・光・背景はステージごとに違うので level.js が持っている。
+  buildStage(stageIndex = 0) {
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x06251f);
-    scene.fog = new THREE.Fog(0x06251f, 45, 175);
-    scene.add(new THREE.HemisphereLight(0xf2fbf7, 0x274b45, 0.78));
-    const sun = new THREE.DirectionalLight(0xfff6e2, 1.15);
-    sun.position.set(24, 60, 18);
-    scene.add(sun);
-    const fill = new THREE.DirectionalLight(0x9de8d8, 0.32);
-    fill.position.set(-30, 14, -25);
-    scene.add(fill);
-
     const world = new World();
-    const level = buildLevel(scene, world);
+    const level = buildLevel(scene, world, stageIndex);
     const player = new Player(world);
     player.pos.copy(level.spawn);
     player.checkpoint.copy(level.spawn);
@@ -100,12 +94,14 @@ class Game {
     this.particleGroup = new THREE.Group();
     scene.add(this.particleGroup);
     this.particles = [];
-    this.areaName = "Start Plaza";
+    this.stageIndex = level.stageIndex;
+    this.areaName = level.stage.startArea;
 
     this.hud.setHp(player.hp);
     this.hud.setCoins(0, level.totalCoins);
     this.hud.setArea(this.areaName);
-    this.hud.setTime(0);
+    this.hud.setStage(level.stageIndex + 1, level.stageCount, level.stage.name);
+    this.hud.setTime(this.time);
   }
 
   disposeStage() {
@@ -118,16 +114,33 @@ class Game {
     });
   }
 
+  // 最初から。ステージ1に戻し、通しの記録も0に戻す。
   startRun() {
-    this.player?.stopScream();
-    this.disposeStage();
-    this.buildStage();
-    this.state = "play";
     this.time = 0;
     this.score = 0;
+    this.pastCoins = 0;
+    this.pastCoinsMax = 0;
+    this.enterStage(0);
+  }
+
+  // クリアして次の面へ。コイン・得点・時間は通しで持ち越し、ライフだけ満タンに戻す。
+  nextStage() {
+    this.pastCoins += this.coins;
+    this.pastCoinsMax += this.level.totalCoins;
+    this.enterStage(this.stageIndex + 1);
+  }
+
+  enterStage(index) {
+    this.player?.stopScream();
+    this.disposeStage();
+    this.buildStage(index);
+    this.state = "play";
     this.coins = 0;
     this.clearTimer = 0;
+    this.clearShown = false;
+    this.pendingNext = false;
     this.hud.hideAll();
+    this.hud.toast(`Stage ${index + 1}: ${this.level.stage.name}`, 2200);
     unlockAudio();
     bgm.play("stage");
   }
@@ -239,7 +252,9 @@ class Game {
     }
     if (this.state === "title" && (this.input.jumpEdge || this.input.hit("enter")))
       this.startRun();
-    if ((this.state === "over" || this.state === "clear") && this.input.hit("r"))
+    if (this.state === "clear" && this.pendingNext && (this.input.jumpEdge || this.input.hit("enter")))
+      this.nextStage();
+    else if ((this.state === "over" || this.state === "clear") && this.input.hit("r"))
       this.startRun();
 
     if (this.state === "play" || this.state === "clear") this.update(dt);
@@ -275,14 +290,28 @@ class Game {
         this.clearShown = true;
         const bonus = Math.max(0, 6000 - Math.floor(this.time * 20));
         this.score += bonus + this.coins * 100;
-        this.hud.setResult(
-          "#clearStat",
-          this.coins,
-          this.level.totalCoins,
-          this.time,
-          this.score
-        );
-        this.hud.show("clear");
+        if (this.stageIndex < this.level.stageCount - 1) {
+          // まだ先がある。次の面の入口を出す。
+          this.pendingNext = true;
+          this.hud.setStageResult(
+            this.stageIndex + 1,
+            this.level.stage.name,
+            this.coins,
+            this.level.totalCoins,
+            this.score,
+            stageInfo(this.stageIndex + 1).name
+          );
+          this.hud.show("stage");
+        } else {
+          this.hud.setResult(
+            "#clearStat",
+            this.pastCoins + this.coins,
+            this.pastCoinsMax + this.level.totalCoins,
+            this.time,
+            this.score
+          );
+          this.hud.show("clear");
+        }
       }
     }
 
@@ -337,8 +366,8 @@ class Game {
       bgm.play("over");
       this.hud.setResult(
         "#overStat",
-        this.coins,
-        this.level.totalCoins,
+        this.pastCoins + this.coins,
+        this.pastCoinsMax + this.level.totalCoins,
         this.time,
         this.score + this.coins * 100
       );
@@ -346,12 +375,18 @@ class Game {
       return;
     }
 
-    // ゴール判定
+    // ゴール判定。土管の上に乗れたらクリアでいい。
+    //
+    // 土管の当たり判定は四角（±1.7）なのに、ここを中心からの距離 1.9 で
+    // 見ていたので、角のほうに乗ると（中心から最大 2.4 離れる）足は着いて
+    // いるのにクリアにならなかった。乗っている床が土管かどうかを直接見て、
+    // そのうえで「ふちに触れている」場合も拾うようにする。
     const g = this.level.goal;
-    if (
-      Math.hypot(p.pos.x - g.pos.x, p.pos.z - g.pos.z) < 1.9 &&
-      Math.abs(p.pos.y - g.pos.y) < 1.6
-    ) {
+    const onPipe = p.grounded && p.ground?.tag === "pipe";
+    const nearPipe =
+      Math.hypot(p.pos.x - g.pos.x, p.pos.z - g.pos.z) < 2.7 &&
+      Math.abs(p.pos.y - g.pos.y) < 1.8;
+    if (onPipe || nearPipe) {
       this.state = "clear";
       this.clearTimer = 0;
       this.clearShown = false;

@@ -106,6 +106,14 @@ body {
   line-height: 1.35;
 }
 
+/* いま何面かは常に出す。区画名より小さく、控えめに。 */
+#stage {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
 #timer {
   font-size: 22px;
   font-weight: 800;

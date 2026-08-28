@@ -140,6 +140,10 @@ try {
     check("説明がタッチ用に入れ替わる", await page.isVisible(".keys-touch"));
     check("キーボードの説明は出さない", !(await page.isVisible(".keys-key")));
 
+    // 説明はタイトルが開いているあいだしか読めないので、ここで控えておく
+    const manual = await page.evaluate(() => document.querySelector(".keys-touch").innerText);
+    check("説明にキーボードのキーが混ざっていない", !/\b(WASD|Arrow keys|Space|Shift)\b/.test(manual), manual.replace(/\n/g, " / "));
+
     // HUD の3つ（ライフ・コイン・右上）が重ならないこと
     const hud = await page.evaluate(() => {
       const r = (s) => document.querySelector(s).getBoundingClientRect();
@@ -164,6 +168,50 @@ try {
     check("スティックが出る", await page.isVisible(".stick-zone"));
     check("JUMP ボタンが出る", await page.isVisible(".tbtn-jump"));
     check("CROUCH ボタンが出る", await page.isVisible(".tbtn-crouch"));
+
+    // 説明に書いてある場所と、ボタンが実際にある場所を突き合わせる。
+    // （説明が「Top right」なのにボタンは左上、という食い違いが実際にあった。
+    //   display:none のあいだは大きさが取れないので、遊び始めてから測る）
+    const where = await page.evaluate(() => {
+      const at = (s) => {
+        const b = document.querySelector(s).getBoundingClientRect();
+        return { cx: b.x + b.width / 2, cy: b.y + b.height / 2 };
+      };
+      return {
+        pause: at(".tbtn-pause"),
+        sound: at(".tbtn-sound"),
+        jump: at(".tbtn-jump"),
+        crouch: at(".tbtn-crouch"),
+        stick: at(".stick-zone"),
+        w: innerWidth,
+        h: innerHeight,
+      };
+    });
+    const left = (p) => p.cx < where.w / 2;
+    const right = (p) => p.cx > where.w / 2;
+    const top = (p) => p.cy < where.h / 2;
+    const bottom = (p) => p.cy > where.h / 2;
+
+    check(
+      "説明の「Top left」どおりに、ポーズと音のボタンが左上にある",
+      manual.includes("Top left") && left(where.pause) && top(where.pause) && left(where.sound) && top(where.sound),
+      `pause=(${Math.round(where.pause.cx)},${Math.round(where.pause.cy)}) sound=(${Math.round(where.sound.cx)},${Math.round(where.sound.cy)}) 画面=${where.w}x${where.h}`
+    );
+    check(
+      "説明の「Lower left」どおりに、スティックが左下にある",
+      manual.includes("Lower left") && left(where.stick) && bottom(where.stick),
+      `stick=(${Math.round(where.stick.cx)},${Math.round(where.stick.cy)})`
+    );
+    check(
+      "説明の「Right side」どおりに、JUMP と CROUCH が右下にある",
+      manual.includes("Right side") && right(where.jump) && bottom(where.jump) && right(where.crouch),
+      `jump=(${Math.round(where.jump.cx)},${Math.round(where.jump.cy)}) crouch=(${Math.round(where.crouch.cx)},${Math.round(where.crouch.cy)})`
+    );
+    check(
+      "説明にボタンの名前が出てくる",
+      manual.includes("JUMP") && manual.includes("CROUCH"),
+      manual.replace(/\n/g, " / ")
+    );
 
     // 画面が開いているあいだはパッドを引っ込める
     await page.evaluate(() => window.__game.setPaused(true));

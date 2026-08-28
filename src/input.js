@@ -49,10 +49,18 @@ export class Input {
     this.touchJump = false;
     this.touchJumpEdge = false;
     this.touchCrouch = false;
+    // ポーズと音の入切。キーボードの P / M にあたるものがタッチには
+    // 無かったので、パッドに小さいボタンを置いて押下エッジを立てる。
+    this.touchPauseEdge = false;
+    this.touchMuteEdge = false;
 
     const pad = document.createElement("div");
     pad.className = "touch-ui";
     pad.innerHTML = `
+      <div class="top-btns">
+        <button class="tsmall tbtn-pause" type="button" aria-label="Pause">II</button>
+        <button class="tsmall tbtn-sound" type="button" aria-label="Sound">&#9834;</button>
+      </div>
       <div class="stick-zone"><div class="stick-base"><div class="stick-knob"></div></div></div>
       <div class="btn-zone">
         <button class="tbtn tbtn-crouch" type="button">CROUCH</button>
@@ -120,6 +128,17 @@ export class Input {
     crouch.addEventListener("pointercancel", crouchUp);
     crouch.addEventListener("pointerleave", crouchUp);
 
+    for (const [sel, flag] of [
+      [".tbtn-pause", "touchPauseEdge"],
+      [".tbtn-sound", "touchMuteEdge"],
+    ]) {
+      pad.querySelector(sel).addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this[flag] = true;
+      });
+    }
+
     // 画面右側のドラッグでカメラ旋回（ボタン以外の領域）
     const camZone = pad.querySelector(".btn-zone");
     let camId = null;
@@ -165,6 +184,14 @@ export class Input {
     return this.down("shift", "control", "x", "j") || this.touchCrouch;
   }
 
+  get pauseEdge() {
+    return this.hit("p") || this.touchPauseEdge;
+  }
+
+  get muteEdge() {
+    return this.hit("m") || this.touchMuteEdge;
+  }
+
   // 毎フレーム冒頭で呼ぶ。移動ベクトルを更新する。
   update() {
     let x = 0;
@@ -193,6 +220,8 @@ export class Input {
   endFrame() {
     this.pressed.clear();
     this.touchJumpEdge = false;
+    this.touchPauseEdge = false;
+    this.touchMuteEdge = false;
     this.camDelta.x = 0;
     this.camDelta.y = 0;
   }

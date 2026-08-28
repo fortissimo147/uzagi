@@ -9,11 +9,11 @@ Three.js の 3D 登り系アクション。ブラウザだけで動く。全3面
 npm install
 npm run dev      # http://localhost:5173
 npm run build    # dist/ に出力（静的ホスティングにそのまま置ける）
-npm test         # 物理・音・プレイ通し・全ステージの自動テスト
+npm test         # 物理・音・プレイ通し・全ステージ・スマホの自動テスト
 npm run standalone  # standalone/tower-of-green-pillars.html （1ファイル完結版）
 ```
 
-Node 18 以上。`npm test` は playwright-core で Chromium を起動する。
+Node 20 以上（`.nvmrc` は 22）。`npm test` は playwright-core で Chromium を起動する。
 
 ## 操作
 
@@ -57,7 +57,8 @@ Node 18 以上。`npm test` は playwright-core で Chromium を起動する。
 | `voice/*.wav` | 主人公の声の素（切り出し済み。ここから voicebank.js を作る） |
 
 テストは `test/` にある。`physics` は当たり判定、`audio` は曲と声のデータ、
-`play` は1面の通し、`stages` は全ステージの地形とクリアの流れを見る。
+`play` は1面の通しとジャンプの挙動、`stages` は全ステージの地形とクリアの流れ、
+`mobile` はタッチ操作と画面の収まりを見る。
 `test/autopilot.mjs` は「目標へ走って崖の手前で跳ぶ」だけの簡易AIで、
 `play` と `stages` の両方が区間のつながりを確かめるのに使っている。
 
@@ -82,6 +83,55 @@ Node 18 以上。`npm test` は playwright-core で Chromium を起動する。
 上へ渡す役は縦に動く床にする。`npm test` の `stages` が、足がかりに床が
 あるか・そこに立てるか・区間を自動操作で越えられるかを機械的に見るので、
 登れない面を作るとそこで落ちる。
+
+## スマホ
+
+スマホ版は別物ではなく、同じビルドが指で触る端末を見分けて
+仮想パッドに切り替わる（CSS の `@media (pointer: coarse)`）。
+
+- 左半分の下がスティック。触れた所が中心になる
+- 右下に JUMP と CROUCH
+- 右側の空いている所をなぞるとカメラが回る
+- ハートの下にポーズと音の入切（キーボードの P / M にあたるもの）
+- タイトルの説明もタッチ用の文面に入れ替わる
+- タイトルやポーズなどの画面が開いているあいだはパッドを引っ込める
+
+`npm test` の `mobile` が、縦・横・小さい画面のそれぞれで
+「各画面のボタンが本当に押せるか（パッドに覆われていないか）」
+「HUD が重なっていないか」「スティックとボタンで動かせるか」を見る。
+
+## 配信（Cloudflare Pages）
+
+`vite.config.js` の `base` が `"./"` なので、`dist/` をそのまま置けば動く。
+`public/_headers` にキャッシュの指定、`.nvmrc` にビルドで使う Node の版が入れてある。
+
+**その場で上げる（GitHub をつながない）**
+
+```sh
+npm run build
+npx wrangler pages deploy dist --project-name uzagi
+```
+
+初回はブラウザが開いて Cloudflare のログインを求められる。
+そのあとプロジェクトが作られ、`https://uzagi.pages.dev` で開けるようになる。
+更新するときは同じ2行をもう一度実行する。
+
+**GitHub につないで push で自動デプロイ**
+
+Cloudflare のダッシュボード → Workers & Pages → Create → Pages →
+Connect to Git でこのリポジトリを選び、次を設定する。
+
+| 項目 | 値 |
+| --- | --- |
+| Framework preset | None |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+
+`.nvmrc` があるので Node の版はそれに合う。以後は push するたびに
+Cloudflare 側でビルドされて公開される。
+
+どちらの方法でも、外部に取りに行くものが無い（画像も音も埋め込み）ので、
+置くだけで音まで含めてそのまま鳴る。
 
 ## 主人公の声
 

@@ -14,13 +14,22 @@ export class Hud {
         <div class="panel">
           <h1>Tower of Green Pillars</h1>
           <p class="sub">3D Action &mdash; three stages, each ending at the pipe on top</p>
-          <ul class="keys">
+          <ul class="keys keys-key">
             <li><b>WASD / Arrow keys</b> Move</li>
             <li><b>Space</b> Jump &mdash; land and tap again at once for a higher double / triple jump</li>
             <li><b>Shift</b> Crouch &mdash; run, then Shift + Space for a long jump</li>
             <li><b>Shift in mid-air</b> Ground pound</li>
             <li><b>Space against a wall</b> Wall kick</li>
             <li><b>Drag / Q &amp; E</b> Turn camera &nbsp; <b>P</b> Pause &nbsp; <b>M</b> Sound</li>
+          </ul>
+          <ul class="keys keys-touch">
+            <li><b>Left stick</b> Move</li>
+            <li><b>JUMP</b> Jump &mdash; land and tap again at once for a higher double / triple jump</li>
+            <li><b>CROUCH</b> Crouch &mdash; run, then CROUCH + JUMP for a long jump</li>
+            <li><b>CROUCH in mid-air</b> Ground pound</li>
+            <li><b>JUMP against a wall</b> Wall kick</li>
+            <li><b>Drag the right side</b> Turn camera</li>
+            <li><b>Top right</b> Pause and sound</li>
           </ul>
           <button class="btn" id="btnStart">START</button>
           <p class="note">On a phone, use the stick on the left and the buttons on the right.</p>
@@ -98,7 +107,11 @@ export class Hud {
   }
 
   setStage(n, total, name) {
-    this.stage.textContent = `Stage ${n}/${total} \u00b7 ${name}`;
+    // 面の名前は狭い画面だと折り返して2行になるので、別の要素にして
+    // CSS 側で引っ込められるようにしておく。
+    this.stage.innerHTML =
+      `<span class="stage-no">Stage ${n}/${total}</span>` +
+      `<span class="stage-name"> \u00b7 ${name}</span>`;
   }
 
   setMuted(muted) {
@@ -122,10 +135,13 @@ export class Hud {
   show(name) {
     for (const [k, el] of Object.entries(this.screens))
       el.classList.toggle("hidden", k !== name);
+    // 画面が開いているあいだはタッチパッドを引っ込める（CSS 側で見ている）
+    this.root.classList.add("modal");
   }
 
   hideAll() {
     for (const el of Object.values(this.screens)) el.classList.add("hidden");
+    this.root.classList.remove("modal");
   }
 
   // 面クリア（まだ先がある）。次に何が来るかまで出す。

@@ -245,8 +245,8 @@ class Game {
     this.fps = Math.round(this.fps ? this.fps * 0.9 + (1 / Math.max(dt, 1e-4)) * 0.1 : 1 / dt);
 
     this.input.update();
-    if (this.input.hit("p")) this.setPaused(this.state === "play");
-    if (this.input.hit("m")) {
+    if (this.input.pauseEdge) this.setPaused(this.state === "play");
+    if (this.input.muteEdge) {
       setMuted(!isMuted());
       this.hud.setMuted(isMuted());
     }

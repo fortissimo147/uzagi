@@ -1,0 +1,10 @@
+# Cloudflare Pages 用。assets/ のファイル名にはビルドごとのハッシュが付くので、
+# 中身が変わればURLも変わる。だから長期キャッシュにしてよい。
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML は毎回取りに行かせる（新しいビルドをすぐ反映させるため）
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate

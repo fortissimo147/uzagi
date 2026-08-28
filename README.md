@@ -11,6 +11,7 @@ npm run dev      # http://localhost:5173
 npm run build    # dist/ に出力（静的ホスティングにそのまま置ける）
 npm test         # 物理・音・プレイ通し・全ステージ・スマホの自動テスト
 npm run standalone  # standalone/tower-of-green-pillars.html （1ファイル完結版）
+npm run deploy   # ビルドして Cloudflare Pages へ公開
 ```
 
 Node 20 以上（`.nvmrc` は 22）。`npm test` は playwright-core で Chromium を起動する。
@@ -108,13 +109,25 @@ Node 20 以上（`.nvmrc` は 22）。`npm test` は playwright-core で Chromiu
 **その場で上げる（GitHub をつながない）**
 
 ```sh
-npm run build
-npx wrangler pages deploy dist --project-name uzagi
+npm run deploy
 ```
 
-初回はブラウザが開いて Cloudflare のログインを求められる。
-そのあとプロジェクトが作られ、`https://uzagi.pages.dev` で開けるようになる。
-更新するときは同じ2行をもう一度実行する。
+ビルドしてから `dist/` を Cloudflare へ送るところまでやる。
+
+- 初回はブラウザが開いて Cloudflare の認可を求められる。許可すると
+  そのまま続きが走る（2回目以降は聞かれない）。
+- プロジェクトが無ければ作るか聞かれるので、そのまま進める。
+  本番ブランチ名を聞かれたら既定のままでよい。
+- 終わると `https://uzagi.pages.dev` で開けるようになる。
+- 更新するときは `npm run deploy` をもう一度実行するだけ。
+
+`uzagi` の部分は `pages.dev` の中で世界共通の名前なので、
+すでに使われていると弾かれる。その場合は package.json の `deploy` の
+`--project-name` を別の名前に変える。
+
+認可はブラウザでの操作が要るので、この作業は自分の端末で行う
+（CI などブラウザの無い所で回すときは、Cloudflare で API トークンを作って
+`CLOUDFLARE_API_TOKEN` に入れる）。
 
 **GitHub につないで push で自動デプロイ**
 

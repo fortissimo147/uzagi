@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "node test/physics.test.mjs && node test/audio.test.mjs && node test/play.test.mjs && node test/stages.test.mjs && node test/mobile.test.mjs",
     "standalone": "vite build && node tools/standalone.mjs",
-    "voicebank": "node tools/make-voicebank.mjs"
+    "voicebank": "node tools/make-voicebank.mjs",
+    "deploy": "npm run build && npx --yes wrangler@4 pages deploy dist --project-name uzagi"
   },
   "dependencies": {
     "three": "^0.180.0"

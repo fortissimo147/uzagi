@@ -1,0 +1,17 @@
+<!doctype html><html><body>
+<canvas id="c" width="1024" height="1024"></canvas>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script>
+<script type="module">
+import { faceTexture } from "/src/heroine.js";
+const tex = faceTexture();
+const out = document.getElementById('c').getContext('2d');
+function draw() {
+  if (tex.image && tex.image.width) {
+    out.drawImage(tex.image, 0, 0);
+    window.__ready = true;
+  } else {
+    requestAnimationFrame(draw);
+  }
+}
+draw();
+</script></body></html>

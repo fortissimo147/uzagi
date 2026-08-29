@@ -146,7 +146,8 @@ function addHair(parent) {
   const hair = new THREE.Group();
 
   // 後頭部。顔より少し大きい楕円球を後ろへ置き、ボブの外形を作る。
-  const back = ellipsoid(0.305, 0.320, 0.245, C.hair, 16, 10);
+  // 見本の滑らかなボブに寄せて分割数を上げ、面のカクつきを抑える。
+  const back = ellipsoid(0.300, 0.335, 0.250, C.hair, 26, 18);
   back.position.set(0, 1.235, -0.010);
 
   // こめかみを覆う小さな房。back の楕円だけだと、側頭部（目の横あたり）で
@@ -154,33 +155,40 @@ function addHair(parent) {
   // 楕円の性質上いちばん前へ出っ張るのが顔の正面＝目鼻になってしまい、
   // 髪が顔にめり込む）。すきまだけを狙って小さく足す。
   for (const side of [-1, 1]) {
-    const temple = ellipsoid(0.075, 0.110, 0.100, C.hair, 10, 8);
-    temple.position.set(0.205 * side, 1.245, 0.150);
+    const temple = ellipsoid(0.085, 0.155, 0.105, C.hair, 14, 10);
+    temple.position.set(0.190 * side, 1.295, 0.140);
     hair.add(temple);
   }
   hair.add(back);
 
   // 左右の毛先。Player の既存「耳揺れ」処理へ接続できる関節にする。
+  // 見本は毛先が尖らず、あご下でふわっと丸く収まる（前は細長い房で
+  // つらら状に尖って見えていた）。
   const tips = [];
   for (const side of [-1, 1]) {
     const joint = new THREE.Group();
-    joint.position.set(0.235 * side, 1.130, 0.035);
-    const tip = ellipsoid(0.072, 0.145, 0.070, C.hairDark, 8, 6);
-    tip.position.y = -0.055;
-    tip.rotation.z = -0.12 * side;
+    joint.position.set(0.230 * side, 1.140, 0.030);
+    const tip = ellipsoid(0.082, 0.115, 0.080, C.hairDark, 16, 12);
+    tip.position.y = -0.048;
+    tip.rotation.z = -0.10 * side;
     joint.add(tip);
     hair.add(joint);
     tips.push(joint);
   }
 
-  // 斜め前髪。少数の広い房に分け、水平なヘルメット形を避ける。
+  // 斜め前髪。見本のように、少数の広い房を同じ向きへ流し、
+  // 互いに重ねて継ぎ目を隠す（数を増やし、平たく＝奥行きを持たせて
+  // 隙間なく重なるようにする。以前は細長い房が並んで房ごとに
+  // 分かれて見えていた）。
   const fringe = [
-    { p: [-0.105, 1.400, 0.205], s: [0.105, 0.205, 0.055], r: -0.48 },
-    { p: [0.005, 1.415, 0.220], s: [0.105, 0.220, 0.052], r: -0.32 },
-    { p: [0.105, 1.385, 0.210], s: [0.085, 0.180, 0.050], r: -0.18 },
+    { p: [-0.148, 1.372, 0.198], s: [0.100, 0.170, 0.085], r: -0.62 },
+    { p: [-0.070, 1.402, 0.222], s: [0.100, 0.165, 0.062], r: -0.44 },
+    { p: [0.020, 1.416, 0.232], s: [0.105, 0.175, 0.062], r: -0.26 },
+    { p: [0.110, 1.398, 0.218], s: [0.095, 0.160, 0.060], r: -0.10 },
+    { p: [0.185, 1.360, 0.190], s: [0.075, 0.130, 0.058], r: 0.06 },
   ];
   for (const f of fringe) {
-    const lock = ellipsoid(f.s[0], f.s[1], f.s[2], C.hair, 8, 6);
+    const lock = ellipsoid(f.s[0], f.s[1], f.s[2], C.hair, 14, 10);
     lock.position.set(...f.p);
     lock.rotation.z = f.r;
     hair.add(lock);
@@ -278,24 +286,29 @@ function addUniform(parent) {
   belt.position.y = 0.645;
   uniform.add(belt);
 
-  // 胸元のリボン。
+  // 胸元のリボン。見本は小ぶりで、金のボタンは左右の襟に離れて付く
+  // （前は蝶ネクタイのように大きく、胸全体を占めていた）。
   const bow = new THREE.Group();
-  bow.position.set(0, 0.925, 0.190);
+  bow.position.set(0, 0.945, 0.192);
   for (const side of [-1, 1]) {
     const wing = new THREE.Mesh(
-      new THREE.ConeGeometry(0.075, 0.135, 4),
+      new THREE.ConeGeometry(0.044, 0.082, 5),
       material(C.black)
     );
     wing.rotation.z = side * (Math.PI / 2);
-    wing.position.x = side * 0.065;
+    wing.position.x = side * 0.038;
     bow.add(wing);
   }
-  const knot = ellipsoid(0.047, 0.047, 0.025, C.black, 8, 6);
+  const knot = ellipsoid(0.026, 0.026, 0.016, C.black, 10, 8);
   bow.add(knot);
-  const medal = ellipsoid(0.018, 0.018, 0.012, C.gold, 8, 6);
-  medal.position.set(0, -0.065, 0.015);
-  bow.add(medal);
   uniform.add(bow);
+
+  // 左右の襟の金ボタン。
+  for (const side of [-1, 1]) {
+    const button = ellipsoid(0.016, 0.016, 0.010, C.gold, 8, 6);
+    button.position.set(0.115 * side, 0.865, 0.198);
+    uniform.add(button);
+  }
 
   parent.add(uniform);
   return uniform;

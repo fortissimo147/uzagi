@@ -73,12 +73,36 @@ const FACE_H = 0.86;
 const FACE_CY = -0.05;
 
 const FACE = {
-  brow: { x: 0.30, y: 0.34, w: 0.30, h: 0.055, tilt: 0.10 },
-  eye: { x: 0.295, y: 0.01, rx: 0.112, ry: 0.104 },
-  gleam: { x: -0.3, y: 0.34, r: 0.30 },
-  lash: 0.035,
-  mouth: { y: -0.40, w: 0.155, h: 0.075 },
-  blush: { x: 0.40, y: -0.16, rx: 0.135, ry: 0.075 },
+  // 眉：内側は太く、弓なりの頂点を経て、外側は細く跳ね上がる。
+  // rabbit.js と同じくベジェ＋太さの変わる線で作る。
+  brow: {
+    p0: [0.100, 0.298],
+    p1: [0.205, 0.372],
+    p2: [0.355, 0.348],
+    p3: [0.465, 0.232],
+    wIn: 0.026,
+    wOut: 0.009,
+  },
+  // 目：まん丸ではなく、切れ長のアーモンド形。上まぶたは高く張り、
+  // 外側の目尻をわずかに跳ね上げて、意志の強い大人びた表情にする。
+  eye: {
+    x: 0.288,
+    y: 0.020,
+    innerX: -0.128,
+    outerX: 0.150,
+    outerY: 0.032, // 目尻の跳ね上がり
+    upperY: 0.118, // 上まぶたの高さ
+    lowerY: -0.078, // 下まぶたの深さ
+  },
+  liner: { w: 0.024, flick: 0.052 }, // アイライン太さと目尻の跳ね
+  iris: { rx: 0.106, ry: 0.112, drop: -0.006 },
+  pupil: { r: 0.050 },
+  gleamBig: { dx: -0.048, dy: 0.048, r: 0.038 },
+  gleamSmall: { dx: 0.050, dy: -0.032, r: 0.017 },
+  nose: { y: -0.148, w: 0.017, h: 0.046 },
+  // 口：やや薄めの大人の唇。キューピッドボウ（上唇の山）と下唇のふくらみ。
+  mouth: { y: -0.398, w: 0.118, peak: 0.040, dip: 0.016, low: 0.062 },
+  blush: { x: 0.395, y: -0.205, rx: 0.108, ry: 0.058 },
 };
 
 // ---------- 小道具 ----------
@@ -133,6 +157,50 @@ function jacketFrontZ(y, proud = 0.006) {
   return r * TORSO_DEPTH + proud;
 }
 
+function bezier(p0, p1, p2, p3, n) {
+  const out = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const u = 1 - t;
+    out.push([
+      u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
+      u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1],
+    ]);
+  }
+  return out;
+}
+
+// 太さが変わる線。眉の「内側が太く外側が細い」形を出すために使う（rabbit.js と同じ手）。
+function taperedStroke(g, pts, w0, w1) {
+  const n = pts.length;
+  const left = [];
+  const right = [];
+  for (let i = 0; i < n; i++) {
+    const w = (w0 + (w1 - w0) * (i / (n - 1))) / 2;
+    const a = pts[Math.max(0, i - 1)];
+    const b = pts[Math.min(n - 1, i + 1)];
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = (-dy / len) * w;
+    const ny = (dx / len) * w;
+    left.push([pts[i][0] + nx, pts[i][1] + ny]);
+    right.push([pts[i][0] - nx, pts[i][1] - ny]);
+  }
+  g.beginPath();
+  g.moveTo(left[0][0], left[0][1]);
+  for (let i = 1; i < n; i++) g.lineTo(left[i][0], left[i][1]);
+  for (let i = n - 1; i >= 0; i--) g.lineTo(right[i][0], right[i][1]);
+  g.closePath();
+  g.fill();
+  g.beginPath();
+  g.arc(pts[0][0], pts[0][1], w0 / 2, 0, Math.PI * 2);
+  g.fill();
+  g.beginPath();
+  g.arc(pts[n - 1][0], pts[n - 1][1], w1 / 2, 0, Math.PI * 2);
+  g.fill();
+}
+
 function canvas2d(w, h) {
   const cv = document.createElement("canvas");
   cv.width = w;
@@ -167,9 +235,12 @@ function planarFaceUV(geo) {
 let faceCache = null;
 
 // 顔は陰影を受けない「貼り紙」1枚。どの角度でも線が同じ濃さで見える。
+// 目・眉・口を「面と線を分けて重ねる」やり方で作る＝虹彩に丸みのある
+// グラデーションを入れ、まぶたのラインを別の細い線で重ね、頬とあごに
+// ごく薄い陰影を足すことで、丸目・一色塗りだった前より大人びた顔にする。
 export function faceTexture() {
   if (faceCache) return faceCache;
-  const S = 640;
+  const S = 1024;
   const H = HEROINE.head;
   const PPU = S / FACE_W;
   const X = (nx) => S / 2 + nx * H.rx * PPU;
@@ -178,14 +249,30 @@ export function faceTexture() {
   const LY = (v) => v * H.ry * PPU;
   const [cv, g] = canvas2d(S, S);
 
-  // ほお紅。輪郭を出さず、ふんわりだけ置く
+  // ---------- 頬・あごの陰影（顔を平たく見せないための輪郭陰影） ----------
+  // こめかみとあごの両脇をごくわずかに暗くし、逆に額と鼻すじをわずかに
+  // 明るくする。輪郭線は出さず、質感だけで丸みを足す。
+  const shadeL = g.createLinearGradient(X(-0.5), 0, X(0.5), 0);
+  shadeL.addColorStop(0, "rgba(70,55,45,0.16)");
+  shadeL.addColorStop(0.16, "rgba(70,55,45,0)");
+  shadeL.addColorStop(0.84, "rgba(70,55,45,0)");
+  shadeL.addColorStop(1, "rgba(70,55,45,0.16)");
+  g.fillStyle = shadeL;
+  g.fillRect(0, 0, S, S);
+  const glow = g.createRadialGradient(X(0), Y(0.22), 0, X(0), Y(0.22), LX(0.55));
+  glow.addColorStop(0, "rgba(255,244,222,0.16)");
+  glow.addColorStop(1, "rgba(255,244,222,0)");
+  g.fillStyle = glow;
+  g.fillRect(0, 0, S, S);
+
+  // ---------- ほお紅 ----------
   const B = FACE.blush;
   for (const s of [-1, 1]) {
     const cx = X(B.x * s);
     const cy = Y(B.y);
     const grd = g.createRadialGradient(cx, cy, 0, cx, cy, LX(B.rx));
-    grd.addColorStop(0, "rgba(236,148,150,0.5)");
-    grd.addColorStop(1, "rgba(236,148,150,0)");
+    grd.addColorStop(0, "rgba(233,140,142,0.42)");
+    grd.addColorStop(1, "rgba(233,140,142,0)");
     g.save();
     g.translate(cx, cy);
     g.scale(1, B.ry / B.rx);
@@ -197,52 +284,161 @@ export function faceTexture() {
     g.restore();
   }
 
-  // 眉。目尻へ向かってゆるく下がる
+  // ---------- 眉：太さの変わる弓なりの線 ----------
   const W = FACE.brow;
-  g.strokeStyle = INK;
-  g.lineWidth = LY(W.h);
+  g.fillStyle = INK;
   for (const s of [-1, 1]) {
-    g.beginPath();
-    g.moveTo(X((W.x - W.w / 2) * s), Y(W.y - W.tilt * 0.2));
-    g.quadraticCurveTo(X(W.x * s), Y(W.y + W.tilt), X((W.x + W.w / 2) * s), Y(W.y - W.tilt));
-    g.stroke();
+    const p = [W.p0, W.p1, W.p2, W.p3].map(([x, y]) => [X(x * s), Y(y)]);
+    taperedStroke(g, bezier(p[0], p[1], p[2], p[3], 28), LX(W.wIn), LX(W.wOut));
   }
 
-  // 目。黒目の上にまつげの線を重ね、光を左上に置く
+  // ---------- 目：切れ長のアーモンド形＋虹彩のグラデーション ----------
   const E = FACE.eye;
-  const G = FACE.gleam;
+  const I = FACE.iris;
+  const P = FACE.pupil;
   for (const s of [-1, 1]) {
-    g.fillStyle = INK;
+    const eyeX = (lx) => X((E.x + lx) * s);
+    const eyeY = (ly) => Y(E.y + ly);
+    const inner = [eyeX(E.innerX), eyeY(0)];
+    const outer = [eyeX(E.outerX), eyeY(E.outerY)];
+    const upCtrl = [eyeX(E.outerX * 0.12), eyeY(E.upperY)];
+    const loCtrl = [eyeX(-0.02), eyeY(E.lowerY)];
+
+    // まぶたの内側を虹彩の色で塗る（アーモンド形そのものが目の形になる）
     g.beginPath();
-    g.ellipse(X(E.x * s), Y(E.y), LX(E.rx), LY(E.ry), 0, 0, Math.PI * 2);
+    g.moveTo(inner[0], inner[1]);
+    g.quadraticCurveTo(upCtrl[0], upCtrl[1], outer[0], outer[1]);
+    g.quadraticCurveTo(loCtrl[0], loCtrl[1], inner[0], inner[1]);
+    g.closePath();
+    g.save();
+    g.clip();
+    const irisCx = eyeX(0.01);
+    const irisCy = eyeY(I.drop);
+    const irisGrd = g.createRadialGradient(
+      irisCx,
+      irisCy - LY(0.03),
+      LX(0.01),
+      irisCx,
+      irisCy,
+      LX(I.rx)
+    );
+    irisGrd.addColorStop(0, "#5a3a28");
+    irisGrd.addColorStop(0.55, "#2c1c14");
+    irisGrd.addColorStop(1, "#100a08");
+    g.fillStyle = irisGrd;
+    g.beginPath();
+    g.ellipse(irisCx, irisCy, LX(I.rx), LY(I.ry), 0, 0, Math.PI * 2);
     g.fill();
-    // まつげ：目の上のふちを一段太くする
+    // 瞳孔
+    g.fillStyle = "#0a0605";
+    g.beginPath();
+    g.ellipse(irisCx, irisCy + LY(0.01), LX(P.r), LY(P.r), 0, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+
+    // まぶたの線（上は太く、目尻でわずかに跳ね上げる。下はごく細く）
     g.strokeStyle = INK;
-    g.lineWidth = LY(FACE.lash);
+    g.lineWidth = LY(FACE.liner.w);
     g.beginPath();
-    g.ellipse(X(E.x * s), Y(E.y), LX(E.rx), LY(E.ry), 0, Math.PI * 1.05, Math.PI * 1.95);
+    g.moveTo(inner[0], inner[1]);
+    g.quadraticCurveTo(upCtrl[0], upCtrl[1], outer[0], outer[1]);
     g.stroke();
-    const cx = X(E.x * s) + LX(E.rx) * G.x * s;
-    const cy = Y(E.y) - LY(E.ry) * G.y;
-    g.fillStyle = "#fdf6ea";
+    // まぶたの線を目尻の少し先まで自然に伸ばす（跳ね上げすぎない）
+    const tailX = eyeX(E.outerX + FACE.liner.flick * 0.55);
+    const tailY = eyeY(E.outerY + FACE.liner.flick * 0.35);
+    taperedStroke(g, [outer, [tailX, tailY]], LX(FACE.liner.w * 0.75), 0);
+    g.lineWidth = LY(FACE.liner.w * 0.22);
+    g.strokeStyle = "rgba(23,18,15,0.55)";
     g.beginPath();
-    g.ellipse(cx, cy, LX(E.rx) * G.r, LY(E.ry) * G.r, 0, 0, Math.PI * 2);
+    g.moveTo(eyeX(E.innerX * 0.6), eyeY(E.lowerY * 0.55));
+    g.quadraticCurveTo(loCtrl[0], loCtrl[1], eyeX(E.outerX * 0.8), eyeY(E.lowerY * 0.3));
+    g.stroke();
+    g.strokeStyle = INK;
+
+    // ハイライト：大きく柔らかいものと、小さく鋭いもの
+    const Gb = FACE.gleamBig;
+    const bigGrd = g.createRadialGradient(
+      eyeX(Gb.dx),
+      eyeY(Gb.dy),
+      0,
+      eyeX(Gb.dx),
+      eyeY(Gb.dy),
+      LX(Gb.r)
+    );
+    bigGrd.addColorStop(0, "rgba(255,250,240,0.95)");
+    bigGrd.addColorStop(1, "rgba(255,250,240,0)");
+    g.fillStyle = bigGrd;
+    g.beginPath();
+    g.ellipse(eyeX(Gb.dx), eyeY(Gb.dy), LX(Gb.r), LY(Gb.r), 0, 0, Math.PI * 2);
+    g.fill();
+    const Gs = FACE.gleamSmall;
+    g.fillStyle = "#fffaf0";
+    g.beginPath();
+    g.ellipse(eyeX(Gs.dx), eyeY(Gs.dy), LX(Gs.r), LY(Gs.r), 0, 0, Math.PI * 2);
     g.fill();
   }
 
-  // 口。赤い小さな唇
+  // ---------- 鼻：ごく小さな陰影2つだけで示す（大きくすると汚れて見える） ----------
+  const N = FACE.nose;
+  for (const s of [-1, 1]) {
+    const grd = g.createRadialGradient(X(N.w * s), Y(N.y), 0, X(N.w * s), Y(N.y), LX(0.016));
+    grd.addColorStop(0, "rgba(70,50,38,0.20)");
+    grd.addColorStop(1, "rgba(70,50,38,0)");
+    g.fillStyle = grd;
+    g.beginPath();
+    g.ellipse(X(N.w * s), Y(N.y), LX(0.016), LY(0.011), 0, 0, Math.PI * 2);
+    g.fill();
+  }
+
+  // ---------- 口：キューピッドボウのある大人の唇 ----------
   const M = FACE.mouth;
   const cx = X(0);
   const cy = Y(M.y);
   const w = LX(M.w);
-  const h = LY(M.h);
-  g.fillStyle = LIP;
+  const peak = LY(M.peak);
+  const dip = LY(M.dip);
+  const low = LY(M.low);
+
+  const lipGrd = g.createLinearGradient(cx, cy - peak, cx, cy + low);
+  lipGrd.addColorStop(0, "#a8425a");
+  lipGrd.addColorStop(0.4, LIP);
+  lipGrd.addColorStop(1, "#c2536c");
+  g.fillStyle = lipGrd;
   g.beginPath();
   g.moveTo(cx - w, cy);
-  g.quadraticCurveTo(cx - w * 0.5, cy - h * 1.1, cx, cy - h * 0.25);
-  g.quadraticCurveTo(cx + w * 0.5, cy - h * 1.1, cx + w, cy);
-  g.quadraticCurveTo(cx + w * 0.4, cy + h * 1.25, cx, cy + h * 1.35);
-  g.quadraticCurveTo(cx - w * 0.4, cy + h * 1.25, cx - w, cy);
+  // 上唇：キューピッドボウ（中央にわずかな谷）
+  g.quadraticCurveTo(cx - w * 0.58, cy - peak, cx - w * 0.14, cy - dip);
+  g.quadraticCurveTo(cx - w * 0.04, cy - dip * 0.3, cx, cy - dip * 0.55);
+  g.quadraticCurveTo(cx + w * 0.04, cy - dip * 0.3, cx + w * 0.14, cy - dip);
+  g.quadraticCurveTo(cx + w * 0.58, cy - peak, cx + w, cy);
+  // 下唇：ふっくらと丸く
+  g.quadraticCurveTo(cx + w * 0.5, cy + low * 1.25, cx, cy + low * 1.4);
+  g.quadraticCurveTo(cx - w * 0.5, cy + low * 1.25, cx - w, cy);
+  g.closePath();
+  g.fill();
+
+  // 口の閉じ目（上下の境の線）
+  g.strokeStyle = "rgba(60,18,26,0.55)";
+  g.lineWidth = LY(0.014);
+  g.beginPath();
+  g.moveTo(cx - w * 0.86, cy);
+  g.quadraticCurveTo(cx, cy + dip * 0.4, cx + w * 0.86, cy);
+  g.stroke();
+
+  // 下唇の艶
+  const glossGrd = g.createRadialGradient(
+    cx + w * 0.16,
+    cy + low * 0.55,
+    0,
+    cx + w * 0.16,
+    cy + low * 0.55,
+    LX(0.045)
+  );
+  glossGrd.addColorStop(0, "rgba(255,235,232,0.55)");
+  glossGrd.addColorStop(1, "rgba(255,235,232,0)");
+  g.fillStyle = glossGrd;
+  g.beginPath();
+  g.ellipse(cx + w * 0.16, cy + low * 0.55, LX(0.05), LY(0.03), 0, 0, Math.PI * 2);
   g.fill();
 
   faceCache = toTexture(cv);

@@ -1,0 +1,49 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;height:100%;background:#06251f;overflow:hidden}
+canvas{display:block}
+</style>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script>
+</head><body>
+<script type="module">
+import * as THREE from "three";
+import { buildHeroine } from "/src/heroine.js";
+import { buildRabbit } from "/src/rabbit.js";
+
+const W = 420, H = 660;
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(2);
+renderer.setSize(W,H);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x06251f);
+// ゲームと同じ明かり
+scene.add(new THREE.HemisphereLight(0xf2fbf7, 0x274b45, 0.78));
+const sun = new THREE.DirectionalLight(0xfff6e2, 1.15); sun.position.set(24,60,18); scene.add(sun);
+const fill = new THREE.DirectionalLight(0x9de8d8, 0.32); fill.position.set(-30,14,-25); scene.add(fill);
+
+const model = buildHeroine();
+scene.add(model.group);
+window.__model = model;
+
+// 足元の床
+const floor = new THREE.Mesh(new THREE.CircleGeometry(2.2, 32),
+  new THREE.MeshLambertMaterial({color:0x2c4a42}));
+floor.rotation.x = -Math.PI/2; floor.position.y = -0.002; scene.add(floor);
+
+const camera = new THREE.PerspectiveCamera(30, W/H, 0.1, 50);
+window.__view = (yaw, dist=4.6, targetY=0.85) => {
+  camera.position.set(Math.sin(yaw)*dist, targetY+0.55, Math.cos(yaw)*dist);
+  camera.lookAt(0, targetY, 0);
+  renderer.render(scene, camera);
+};
+window.__swap = (which) => {
+  scene.remove(model.group);
+  const m = which === "rabbit" ? buildRabbit() : buildHeroine();
+  scene.add(m.group);
+  window.__model = m;
+};
+window.__view(0);
+window.__ready = true;
+</script></body></html>

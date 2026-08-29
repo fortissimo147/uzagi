@@ -1,0 +1,51 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;background:#06251f}canvas{display:block}
+</style>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script>
+</head><body>
+<canvas id="out" width="1500" height="620"></canvas>
+<script type="module">
+import * as THREE from "three";
+import { buildHeroine } from "/src/heroine.js";
+import { buildRabbit } from "/src/rabbit.js";
+
+const CW = 300, CH = 620;
+const r = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
+r.setPixelRatio(2); r.setSize(CW,CH); r.outputColorSpace = THREE.SRGBColorSpace;
+
+function makeScene(model){
+  const sc = new THREE.Scene();
+  sc.background = new THREE.Color(0x06251f);
+  sc.add(new THREE.HemisphereLight(0xf2fbf7,0x274b45,0.78));
+  const sun=new THREE.DirectionalLight(0xfff6e2,1.15); sun.position.set(24,60,18); sc.add(sun);
+  const fill=new THREE.DirectionalLight(0x9de8d8,0.32); fill.position.set(-30,14,-25); sc.add(fill);
+  const fl=new THREE.Mesh(new THREE.CircleGeometry(2.4,32), new THREE.MeshLambertMaterial({color:0x2c4a42}));
+  fl.rotation.x=-Math.PI/2; sc.add(fl);
+  sc.add(model);
+  return sc;
+}
+const hero = buildHeroine();
+const rab  = buildRabbit();
+const scH = makeScene(hero.group);
+const scR = makeScene(rab.group);
+
+const cam = new THREE.PerspectiveCamera(28, CW/CH, 0.1, 50);
+const out = document.getElementById("out").getContext("2d");
+out.fillStyle="#06251f"; out.fillRect(0,0,1500,620);
+
+function draw(sc, yaw, dist, targetY, slot, label){
+  cam.position.set(Math.sin(yaw)*dist, targetY+0.5, Math.cos(yaw)*dist);
+  cam.lookAt(0,targetY,0);
+  r.render(sc,cam);
+  out.drawImage(r.domElement, slot*CW, 0, CW, CH);
+  out.fillStyle="rgba(0,0,0,0.55)"; out.fillRect(slot*CW, 0, CW, 26);
+  out.fillStyle="#dff3ec"; out.font="15px sans-serif";
+  out.fillText(label, slot*CW+10, 18);
+}
+draw(scH, 0,        4.9, 0.85, 0, "正面");
+draw(scH, 0.6,      4.9, 0.85, 1, "斜め");
+draw(scH, Math.PI/2,4.9, 0.85, 2, "横");
+draw(scH, Math.PI,  4.9, 0.85, 3, "後ろ");
+draw(scR, 0.5,      4.9, 0.85, 4, "うさぎ（今の主人公・大きさ比べ）");
+window.__done = true;
+</script></body></html>

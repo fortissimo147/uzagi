@@ -44,6 +44,23 @@ window.__swap = (which) => {
   scene.add(m.group);
   window.__model = m;
 };
+// 顔テクスチャは TextureLoader.load() の非同期読み込みなので、
+// __ready を先に立てると、まだ届いていない空テクスチャのまま
+// スクリーンショットを撮ってしまうことがある。届くまで待つ。
+function waitTexture(mesh, timeout = 5000) {
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    (function poll() {
+      const img = mesh.material.map?.image;
+      if (img && img.width) return resolve();
+      if (performance.now() - t0 > timeout) return resolve();
+      requestAnimationFrame(poll);
+    })();
+  });
+}
+
+window.__view(0);
+await waitTexture(model.face);
 window.__view(0);
 window.__ready = true;
 </script></body></html>

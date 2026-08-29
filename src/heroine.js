@@ -67,7 +67,12 @@ const SKIRT_DEPTH = 0.86;
 // rabbit.js のクリーム色と同じ考え方。
 const SUIT_RGB = [2.55, 2.50, 2.42]; // ジャケットとスカートの白
 const SUIT_EM = 0x4c4a44;
-const SKIN_RGB = [2.45, 1.98, 1.76]; // 肌
+// 肌。顔だけ写真テクスチャ（ライティングを受けない焼き込み画像）なので、
+// 首・耳もとの procedural な肌がその色に近づくよう、実際にレンダリング
+// された色を見比べて（写真の頬 (250,186,160) に対し、直したときの
+// 首は (227,206,185) だった）調整してある。ここが合っていないと、
+// 写真と3D部分の継ぎ目がリング状に見えてしまう。
+const SKIN_RGB = [2.70, 1.79, 1.52]; // 肌
 const SKIN_EM = 0x4a382e;
 const HAIR_COL = 0x241811; // 髪（暗い茶）
 const HAIR_EM = 0x120c08;
@@ -357,8 +362,12 @@ export function buildHeroine() {
   const H = R.head;
   put(ellipsoid(H.rx, H.ry, H.rz, 24, 18), skin, 0, H.y, 0);
 
-  // 顔は頭の正面に貼りつく1枚の殻。陰影を受けないので線がどこでも同じ濃さ。
-  const faceGeo = new THREE.SphereGeometry(1, 24, 16, Math.PI / 2 - 1.0, 2.0, 0.70, 1.45);
+  // 顔は頭の正面に貼りつく1枚の殻。陰影を受けないので線がどこでも同じ濃さ
+  // （陰影を受けさせると、あご下などが緑がかった環境光で汚れて不自然になる
+  // ため、あえて陰影なしのまま。継ぎ目はマスクの縁を肌色に近づけて消す）。
+  // thetaStart は髪の冠（crownGeo、theta 0〜1.14）より下から始める。
+  // 画像のマスクをほぼ余白なしにしたので、ここが浅いと目が冠の裏に隠れる。
+  const faceGeo = new THREE.SphereGeometry(1, 24, 16, Math.PI / 2 - 1.0, 2.0, 1.16, 0.99);
   faceGeo.scale(H.rx * 1.01, H.ry * 1.01, H.rz * 1.01);
   planarFaceUV(faceGeo);
   const face = new THREE.Mesh(

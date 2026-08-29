@@ -42,6 +42,22 @@ function draw(sc, yaw, dist, targetY, slot, label){
   out.fillStyle="#dff3ec"; out.font="15px sans-serif";
   out.fillText(label, slot*CW+10, 18);
 }
+// 顔テクスチャは TextureLoader.load() の非同期読み込みなので、
+// 待たずに撮ると素の肌色（読み込み前の空テクスチャ）が写ってしまう。
+// 実際に画像が届くまで待ってから撮る。
+function waitTexture(mesh, timeout = 5000) {
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    (function poll() {
+      const img = mesh.material.map?.image;
+      if (img && img.width) return resolve();
+      if (performance.now() - t0 > timeout) return resolve(); // 待ちすぎない
+      requestAnimationFrame(poll);
+    })();
+  });
+}
+await waitTexture(hero.face);
+
 draw(scH, 0,        4.9, 0.85, 0, "正面");
 draw(scH, 0.6,      4.9, 0.85, 1, "斜め");
 draw(scH, Math.PI/2,4.9, 0.85, 2, "横");

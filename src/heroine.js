@@ -64,8 +64,8 @@ const TRIM_EM = 0x0b0b0f;
 const GOLD_COL = 0xc9a227;
 const GOLD_EM = 0x4a3a05;
 
-const INK = "#17120f";
-const LIP = "#b8324a";
+const INK = "#221a15"; // 眉・まぶたの線。純黒より少し柔らかい色にして、きつく見えないようにする
+const LIP = "#d76b7e"; // 赤みを抑えたやわらかいピンク
 
 // ---------- 顔（頭の半径を1とする平行投影座標。右が+x、上が+y） ----------
 const FACE_W = 0.86;
@@ -73,36 +73,38 @@ const FACE_H = 0.86;
 const FACE_CY = -0.05;
 
 const FACE = {
-  // 眉：内側は太く、弓なりの頂点を経て、外側は細く跳ね上がる。
-  // rabbit.js と同じくベジェ＋太さの変わる線で作る。
+  // 眉：前回より弧をゆるめ、跳ね上げをほぼ無くして「きりっと」より
+  // 「やわらかい」印象に寄せた。太さの変化は残す。
   brow: {
-    p0: [0.100, 0.298],
-    p1: [0.205, 0.372],
-    p2: [0.355, 0.348],
-    p3: [0.465, 0.232],
-    wIn: 0.026,
-    wOut: 0.009,
+    p0: [0.098, 0.290],
+    p1: [0.195, 0.340],
+    p2: [0.335, 0.322],
+    p3: [0.440, 0.262],
+    wIn: 0.025,
+    wOut: 0.011,
   },
-  // 目：まん丸ではなく、切れ長のアーモンド形。上まぶたは高く張り、
-  // 外側の目尻をわずかに跳ね上げて、意志の強い大人びた表情にする。
+  // 目：切れ長のアーモンドはそのままに、ひとまわり大きく・丸みを増やして
+  // かわいらしさを出す。目尻の跳ね上げもほぼ無くす（気の強さより親しみやすさ）。
   eye: {
-    x: 0.288,
-    y: 0.020,
-    innerX: -0.128,
-    outerX: 0.150,
-    outerY: 0.032, // 目尻の跳ね上がり
-    upperY: 0.118, // 上まぶたの高さ
-    lowerY: -0.078, // 下まぶたの深さ
+    x: 0.286,
+    y: 0.018,
+    innerX: -0.138,
+    outerX: 0.152,
+    outerY: 0.014, // 目尻の跳ね上がり（前よりずっと控えめ）
+    upperY: 0.140, // 上まぶたの高さ（前より高く＝目を大きく開く）
+    lowerY: -0.096, // 下まぶたの深さ
   },
-  liner: { w: 0.024, flick: 0.052 }, // アイライン太さと目尻の跳ね
-  iris: { rx: 0.106, ry: 0.112, drop: -0.006 },
-  pupil: { r: 0.050 },
-  gleamBig: { dx: -0.048, dy: 0.048, r: 0.038 },
-  gleamSmall: { dx: 0.050, dy: -0.032, r: 0.017 },
-  nose: { y: -0.148, w: 0.017, h: 0.046 },
-  // 口：やや薄めの大人の唇。キューピッドボウ（上唇の山）と下唇のふくらみ。
-  mouth: { y: -0.398, w: 0.118, peak: 0.040, dip: 0.016, low: 0.062 },
-  blush: { x: 0.395, y: -0.205, rx: 0.108, ry: 0.058 },
+  liner: { w: 0.020, flick: 0.014 }, // アイライン太さと目尻の伸び（ごくわずか）
+  iris: { rx: 0.122, ry: 0.128, drop: -0.004 },
+  pupil: { r: 0.052 },
+  gleamBig: { dx: -0.052, dy: 0.056, r: 0.046 },
+  gleamSmall: { dx: 0.048, dy: -0.038, r: 0.020 },
+  sparkle: { dx: -0.010, dy: -0.072, r: 0.012 }, // 下にもう一粒、瞳をきらきらさせる
+  nose: { y: -0.140, w: 0.015, h: 0.040 },
+  // 口：赤みを抑えた、やわらかいピンクの小さな口。キューピッドボウは浅く、
+  // 少し微笑んで見えるよう口角をわずかに上げる。
+  mouth: { y: -0.380, w: 0.100, peak: 0.030, dip: 0.012, low: 0.052, corner: 0.010 },
+  blush: { x: 0.400, y: -0.185, rx: 0.130, ry: 0.070 },
 };
 
 // ---------- 小道具 ----------
@@ -322,9 +324,9 @@ export function faceTexture() {
       irisCy,
       LX(I.rx)
     );
-    irisGrd.addColorStop(0, "#5a3a28");
-    irisGrd.addColorStop(0.55, "#2c1c14");
-    irisGrd.addColorStop(1, "#100a08");
+    irisGrd.addColorStop(0, "#8a5a34"); // 明るい琥珀色を中心に置いて、瞳をきらきら見せる
+    irisGrd.addColorStop(0.5, "#3c2415");
+    irisGrd.addColorStop(1, "#150d09");
     g.fillStyle = irisGrd;
     g.beginPath();
     g.ellipse(irisCx, irisCy, LX(I.rx), LY(I.ry), 0, 0, Math.PI * 2);
@@ -376,6 +378,11 @@ export function faceTexture() {
     g.beginPath();
     g.ellipse(eyeX(Gs.dx), eyeY(Gs.dy), LX(Gs.r), LY(Gs.r), 0, 0, Math.PI * 2);
     g.fill();
+    // もう一粒、下寄りに小さく。3点の光を散らすと瞳がきらきらして見える
+    const Sp = FACE.sparkle;
+    g.beginPath();
+    g.ellipse(eyeX(Sp.dx), eyeY(Sp.dy), LX(Sp.r), LY(Sp.r), 0, 0, Math.PI * 2);
+    g.fill();
   }
 
   // ---------- 鼻：ごく小さな陰影2つだけで示す（大きくすると汚れて見える） ----------
@@ -390,7 +397,7 @@ export function faceTexture() {
     g.fill();
   }
 
-  // ---------- 口：キューピッドボウのある大人の唇 ----------
+  // ---------- 口：口角をわずかに上げた、やわらかい小さな口 ----------
   const M = FACE.mouth;
   const cx = X(0);
   const cy = Y(M.y);
@@ -398,31 +405,32 @@ export function faceTexture() {
   const peak = LY(M.peak);
   const dip = LY(M.dip);
   const low = LY(M.low);
+  const corner = LY(M.corner); // 口角の上がり（プラスで微笑みになる）
 
   const lipGrd = g.createLinearGradient(cx, cy - peak, cx, cy + low);
-  lipGrd.addColorStop(0, "#a8425a");
+  lipGrd.addColorStop(0, "#c85f74");
   lipGrd.addColorStop(0.4, LIP);
-  lipGrd.addColorStop(1, "#c2536c");
+  lipGrd.addColorStop(1, "#e592a0");
   g.fillStyle = lipGrd;
   g.beginPath();
-  g.moveTo(cx - w, cy);
-  // 上唇：キューピッドボウ（中央にわずかな谷）
-  g.quadraticCurveTo(cx - w * 0.58, cy - peak, cx - w * 0.14, cy - dip);
-  g.quadraticCurveTo(cx - w * 0.04, cy - dip * 0.3, cx, cy - dip * 0.55);
-  g.quadraticCurveTo(cx + w * 0.04, cy - dip * 0.3, cx + w * 0.14, cy - dip);
-  g.quadraticCurveTo(cx + w * 0.58, cy - peak, cx + w, cy);
+  g.moveTo(cx - w, cy - corner);
+  // 上唇：ごく浅いキューピッドボウ（谷を前より浅くして険しく見せない）
+  g.quadraticCurveTo(cx - w * 0.55, cy - peak, cx - w * 0.14, cy - dip * 0.7);
+  g.quadraticCurveTo(cx - w * 0.04, cy - dip * 0.2, cx, cy - dip * 0.4);
+  g.quadraticCurveTo(cx + w * 0.04, cy - dip * 0.2, cx + w * 0.14, cy - dip * 0.7);
+  g.quadraticCurveTo(cx + w * 0.55, cy - peak, cx + w, cy - corner);
   // 下唇：ふっくらと丸く
-  g.quadraticCurveTo(cx + w * 0.5, cy + low * 1.25, cx, cy + low * 1.4);
-  g.quadraticCurveTo(cx - w * 0.5, cy + low * 1.25, cx - w, cy);
+  g.quadraticCurveTo(cx + w * 0.5, cy + low * 1.2, cx, cy + low * 1.32);
+  g.quadraticCurveTo(cx - w * 0.5, cy + low * 1.2, cx - w, cy - corner);
   g.closePath();
   g.fill();
 
-  // 口の閉じ目（上下の境の線）
-  g.strokeStyle = "rgba(60,18,26,0.55)";
-  g.lineWidth = LY(0.014);
+  // 口の閉じ目（上下の境の線）。口角を上げて、微笑んで見えるようにする
+  g.strokeStyle = "rgba(150,70,84,0.5)";
+  g.lineWidth = LY(0.012);
   g.beginPath();
-  g.moveTo(cx - w * 0.86, cy);
-  g.quadraticCurveTo(cx, cy + dip * 0.4, cx + w * 0.86, cy);
+  g.moveTo(cx - w * 0.82, cy - corner);
+  g.quadraticCurveTo(cx, cy + dip * 0.35, cx + w * 0.82, cy - corner);
   g.stroke();
 
   // 下唇の艶

@@ -31,6 +31,7 @@ export class Hud {
             <li><b>Right side</b> Drag an empty spot to turn the camera</li>
             <li><b>Top left</b> Pause and sound</li>
           </ul>
+          <button class="btn ghost" id="btnCharacter">Character: <span id="characterName"></span></button>
           <button class="btn" id="btnStart">START</button>
           <p class="note">On a phone, use the stick on the left and the buttons on the right.</p>
         </div>
@@ -72,6 +73,7 @@ export class Hud {
     this.timer = root.querySelector("#timer");
     this.toastEl = root.querySelector("#toast");
     this.sound = root.querySelector("#sound");
+    this.characterName = root.querySelector("#characterName");
     this.screens = {
       title: root.querySelector("#screenTitle"),
       pause: root.querySelector("#screenPause"),
@@ -117,6 +119,10 @@ export class Hud {
   setMuted(muted) {
     this.sound.textContent = muted ? "♪ OFF" : "♪ ON";
     this.sound.classList.toggle("off", muted);
+  }
+
+  setCharacterLabel(name) {
+    this.characterName.textContent = name;
   }
 
   setTime(sec) {

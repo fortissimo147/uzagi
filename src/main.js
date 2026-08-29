@@ -6,6 +6,7 @@ import { Player } from "./player.js";
 import { FollowCamera } from "./camera.js";
 import { Input } from "./input.js";
 import { Hud } from "./hud.js";
+import { getCharacter, setCharacter, nextCharacter, labelOf } from "./character.js";
 import {
   sfx,
   cry,
@@ -50,8 +51,10 @@ class Game {
     this.buildStage();
     this.hud.show("title");
     this.hud.setMuted(isMuted());
+    this.hud.setCharacterLabel(labelOf(getCharacter()));
 
     this.hud.on("#btnStart", () => this.startRun());
+    this.hud.on("#btnCharacter", () => this.cycleCharacter());
     // 自動再生の制限があるので、最初のクリック／キー操作で音を解錠する
     const wake = () => {
       unlockAudio();
@@ -79,7 +82,7 @@ class Game {
     const scene = new THREE.Scene();
     const world = new World();
     const level = buildLevel(scene, world, stageIndex);
-    const player = new Player(world);
+    const player = new Player(world, getCharacter());
     player.pos.copy(level.spawn);
     player.checkpoint.copy(level.spawn);
     scene.add(player.object, player.shadow);
@@ -112,6 +115,18 @@ class Game {
         for (const m of mats) m?.dispose?.();
       }
     });
+  }
+
+  // キャラクターの見た目を切り替える。タイトル画面にいるあいだは
+  // その場でステージ（＝待機中のモデル）を作り直して、すぐ見た目に反映する。
+  cycleCharacter() {
+    const id = nextCharacter(getCharacter());
+    setCharacter(id);
+    this.hud.setCharacterLabel(labelOf(id));
+    if (this.state === "title") {
+      this.disposeStage();
+      this.buildStage(0);
+    }
   }
 
   // 最初から。ステージ1に戻し、通しの記録も0に戻す。

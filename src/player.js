@@ -3,6 +3,7 @@
 import * as THREE from "three";
 import { moveBody } from "./physics.js";
 import { buildHeroine } from "./heroine.js";
+import { buildRabbit } from "./rabbit.js";
 import { sfx, cry } from "./audio.js";
 
 const GRAVITY = -34;
@@ -17,8 +18,9 @@ const JUMP3 = 19.5;
 const SCREAM_SPEED = -28; // これより速く落ちたら悲鳴（3段ジャンプの落ち際は -19.5）
 
 export class Player {
-  constructor(world) {
+  constructor(world, character = "heroine") {
     this.world = world;
+    this.character = character;
     this.radius = 0.55;
     this.height = 1.5;
 
@@ -61,7 +63,7 @@ export class Player {
   }
 
   _buildModel() {
-    const r = buildHeroine();
+    const r = this.character === "rabbit" ? buildRabbit() : buildHeroine();
     this.body = r.body;
     this.face = r.face;
     this.ears = r.ears;

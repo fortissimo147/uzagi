@@ -289,6 +289,14 @@ body {
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
 }
 
+/* キャラ切り替えは START より控えめな大きさにして、追加の高さを抑える。 */
+#btnCharacter {
+  display: block;
+  margin: 0 auto 6px;
+  padding: 9px 22px;
+  font-size: 15px;
+}
+
 .note {
   margin: 10px 0 0;
   font-size: 12px;
@@ -312,9 +320,10 @@ body {
   }
 }
 
-/* 横向きのスマホのように縦が短いとき。タイトルの説明が長いと START が
-   画面の外へ押し出されて押せなくなるので、行間と余白を詰めて収める。 */
-@media (max-height: 520px) {
+/* 縦が短いとき（横向きのスマホや、縦向きでも小さめの画面）。タイトルの
+   説明とキャラ切り替えボタンが加わった分だけ START が画面の外へ押し出され
+   やすいので、行間と余白を詰めて収める。 */
+@media (max-height: 660px) {
   .panel {
     padding: 12px 16px 14px;
   }
@@ -344,6 +353,12 @@ body {
     padding: 10px 26px;
     margin: 4px;
     font-size: 16px;
+  }
+
+  #btnCharacter {
+    padding: 7px 18px;
+    margin: 0 auto 4px;
+    font-size: 13px;
   }
 
   .note {

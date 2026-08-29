@@ -1,8 +1,8 @@
-// プレイヤー（白ウサギ）のモデルと操作。
+// プレイヤーのモデルと操作。
 // 走り／段差／3段ジャンプ／幅跳び／壁キック／ヒップドロップを備える。
 import * as THREE from "three";
 import { moveBody } from "./physics.js";
-import { buildRabbit } from "./rabbit.js";
+import { buildHeroine } from "./heroine.js";
 import { sfx, cry } from "./audio.js";
 
 const GRAVITY = -34;
@@ -61,7 +61,7 @@ export class Player {
   }
 
   _buildModel() {
-    const r = buildRabbit();
+    const r = buildHeroine();
     this.body = r.body;
     this.face = r.face;
     this.ears = r.ears;

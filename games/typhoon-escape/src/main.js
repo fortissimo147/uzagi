@@ -97,7 +97,7 @@ class App {
     this.introT = 0;
     this.hud.hide();
     this.input.enabled = true;
-    this.game.spawn(CFG.CAM_PLAY);
+    this.game.spawn(this.follow.playArc);
     this.goFullscreen();
   }
 
@@ -132,7 +132,7 @@ class App {
     if (this.state === "play" || this.state === "over") {
       g.vx = this.input.vx;
       g.vy = this.input.vy;
-      g.step(dt, CFG.CAM_PLAY);
+      g.step(dt, this.follow.playArc);
       if (g.over && this.state === "play") {
         this.state = "over";
         this.overAt = performance.now();

@@ -243,12 +243,13 @@ await page.waitForTimeout(6000); // ソフトウェア描画だと数 fps しか
   // 収束に実時間がかかるので、壁時計で待たずに収束そのものを待つ。
   let ok = true;
   try {
-    await page.waitForFunction(() => window.__game.follow.visible <= 9.28 * 1.02, null, { timeout: 40000 });
+    await page.waitForFunction(() => window.__game.follow.visible <= window.__game.cfg.CAM_PLAY * 1.02, null, { timeout: 40000 });
   } catch {
     ok = false;
   }
   const v = await page.evaluate(() => window.__game.follow.visible);
-  check(`プレイ中は PLAY 画角(9.28度)より引かない（${v.toFixed(2)} 度）`, ok && v >= 4.6);
+  const floor = await page.evaluate(() => window.__game.cfg.CAM_FLOOR);
+  check(`プレイ中は PLAY 画角より引かない（${v.toFixed(2)} 度）`, ok && v >= floor * 0.99);
 }
 }
 // 元に戻す
@@ -266,25 +267,31 @@ section("面積で押せるかが決まる（§1b.6）");
 {
   const d = await page.evaluate(async () => {
     const g = window.__game.game;
+    g.reset(); // 直前のゲームオーバー状態だと step() が動かないので戻す
     const big = g.landBodies.filter((b) => !b.pushable);
     const small = g.landBodies.filter((b) => b.pushable);
-    // 一番大きい陸（ユーラシア）の中にわざと台湾を置いて数フレーム回す
-    const D = Math.PI / 180;
-    const put = (lat, lon) => {
-      g.pos = [Math.cos(lat * D) * Math.sin(lon * D), Math.sin(lat * D), Math.cos(lat * D) * Math.cos(lon * D)];
-      g.q = [0, 0, 0, 1];
-      g.player.q = [0, 0, 0, 1];
-      g.player._dirty = true;
-      g.updateWorldPts();
-    };
-    put(30, 105); // 中国内陸のど真ん中
-    for (let i = 0; i < 20; i++) g.step(0.03);
+    // 大陸へ向かってひたすら押し当てる
+    const lat0 = (Math.asin(g.pos[1]) * 180) / Math.PI;
+    g.vx = -1;
+    g.vy = 0;
+    for (let i = 0; i < 300; i++) g.step(0.05);
     const bigMoved = big.filter((b) => b.q[3] !== 1).length;
-    return { nBig: big.length, nSmall: small.length, bigMoved, playerKm2: g.player.area * 6371.0088 ** 2 };
+    const lon = (v) => (Math.atan2(v[0], v[2]) * 180) / Math.PI;
+    return {
+      nBig: big.length,
+      nSmall: small.length,
+      bigMoved,
+      blocked: g.blockedBy(null),
+      lonNow: lon(g.pos),
+      lat0,
+      playerKm2: g.player.area * 6371.0088 ** 2,
+    };
   });
   check(`台湾（${Math.round(d.playerKm2).toLocaleString()} km²）より大きい陸が ${d.nBig} 個ある`, d.nBig > 30);
   check(`小さい陸が ${d.nSmall} 個ある`, d.nSmall > 3900);
-  check("大陸のど真ん中に入り込んでも、大きい陸はひとつも動かない", d.bigMoved === 0, `${d.bigMoved} 個動いた`);
+  check("大陸へ押し当てても、大きい陸はひとつも動かない", d.bigMoved === 0, `${d.bigMoved} 個動いた`);
+  check(`大陸に阻まれて止まる（経度 120.9 → ${d.lonNow.toFixed(2)}）`, d.lonNow > 117 && d.lonNow < 120.9);
+  check("止まった位置で壁にめり込んでいない", d.blocked === false);
 }
 
 section("やり直し");

@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "bake:geo": "node tools/bake-geo.mjs",
     "calibrate": "node tools/calibrate.mjs",
-    "test": "node test/names.test.mjs && node test/sphere.test.mjs && node test/geo.test.mjs && node test/tessellate.test.mjs && node test/config.test.mjs && node test/storm.test.mjs && node test/region.test.mjs && node test/stormview.test.mjs && node test/body.test.mjs && node test/layering.test.mjs && node test/deploy.test.mjs && node test/play.test.mjs && node test/mobile.test.mjs",
+    "test": "node test/names.test.mjs && node test/sphere.test.mjs && node test/geo.test.mjs && node test/tessellate.test.mjs && node test/config.test.mjs && node test/storm.test.mjs && node test/region.test.mjs && node test/stormview.test.mjs && node test/body.test.mjs && node test/barrier.test.mjs && node test/layering.test.mjs && node test/deploy.test.mjs && node test/play.test.mjs && node test/mobile.test.mjs",
     "standalone": "vite build && node tools/standalone.mjs",
     "deploy": "npm run build && npx --yes wrangler@4 pages deploy dist --project-name typhoon-escape"
   },

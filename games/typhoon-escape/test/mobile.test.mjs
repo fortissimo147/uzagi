@@ -69,9 +69,21 @@ for (const [label, w, h] of sizes) {
   await page.evaluate(() => {
     for (let i = 0; i < 3; i++) window.__game.hud.news(`Typhoon No. ${i} (Wobbles) has formed.`, "formed");
   });
-  await page.waitForTimeout(250);
+  // #pad は bottom に 0.2s のトランジションが掛かっている。固定待ちだと
+  // 描画が重い環境で取りこぼすので、動いたことを待つ。
+  let lifted = true;
+  try {
+    await page.waitForFunction(
+      (y0) => document.getElementById("pad").getBoundingClientRect().y < y0 - 20,
+      padBefore,
+      { timeout: 15000 }
+    );
+  } catch {
+    lifted = false;
+  }
   const padAfter = (await box("#pad")).y;
-  check("ニュース速報が増えるとスティックが持ち上がる", padAfter < padBefore - 20, `${padBefore} → ${padAfter}`);
+  const rows = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--rows"));
+  check("ニュース速報が増えるとスティックが持ち上がる", lifted, `${padBefore} → ${padAfter} (--rows=${rows})`);
   const ticker = await box("#ticker");
   check("スティックとティッカーが重ならない", (await box("#pad")).y + (await box("#pad")).height <= ticker.y + 2,
     `pad底=${(await box("#pad")).y + (await box("#pad")).height} ticker上=${ticker.y}`);

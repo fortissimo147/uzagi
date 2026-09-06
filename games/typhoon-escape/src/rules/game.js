@@ -2,8 +2,73 @@
 // three.js には一切触れない（§0.3）。
 import * as S from "../world/sphere.js";
 import { createStorm, stepStorm, setForecast, outOfPlay, lethalRadius } from "../world/storm.js";
-import { createBody, pushBody, slideBody, bodyCenter } from "../world/body.js";
+import { createBody, pushBody, slideBody, bodyCenter, pointInBody, coastNear, edgesNear } from "../world/body.js";
 import { CFG, PATTERNS, START_LATLON } from "./config.js";
+
+const TMP_C = [0, 0, 0];
+const TMP_P = [0, 0, 0];
+const TMP_EDGES = [];
+
+/** 線分 AB と CD が交差するか（端点の接触も交差とみなす）。経緯度平面で解く。 */
+function segCross(ax, ay, bx, by, cx, cy, dx, dy) {
+  const d1 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+  const d2 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax);
+  if (d1 > 0 === d2 > 0) return false;
+  const d3 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx);
+  const d4 = (dx - cx) * (by - cy) - (dy - cy) * (bx - cx);
+  return d3 > 0 !== d4 > 0;
+}
+
+/**
+ * 海岸線を**等間隔に取り直す**。壁の判定点に使う（§1b.8）。
+ *
+ * 元の頂点をそのまま間引くと、データが疎な所に隙間が残る（実測で最大 39.6 km）。
+ * 1 フレームの最大移動 12.9 km より大きい隙間があると、細い岬をその隙間で
+ * またいで素通りしうる。距離で取り直せば隙間の上限を設計で決められる。
+ */
+function resampleRing(ring, maxGapDeg) {
+  const v = ring.map(([lon, lat]) => S.toVec(lat, lon));
+  const out = [];
+  for (let i = 0; i < v.length; i++) {
+    const a = v[i];
+    const b = v[(i + 1) % v.length];
+    out.push(a);
+    const d = S.angleDeg(a, b);
+    const n = Math.floor(d / maxGapDeg);
+    for (let k = 1; k <= n; k++) {
+      const t = k / (n + 1);
+      const m = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+      out.push(S.normalize(m));
+    }
+  }
+  // 近すぎる点は落とす（判定回数を減らす）
+  const kept = [];
+  for (const p of out) {
+    if (!kept.length || S.angleDeg(kept[kept.length - 1], p) >= maxGapDeg * 0.5) kept.push(p);
+  }
+  return kept;
+}
+
+/**
+ * 台湾の内部にある点を格子状に拾う。壁のすり抜け防止用（§1b.8）。
+ * 海岸線の頂点だけだと、細い半島を台湾がまたいだとき素通りしてしまう。
+ */
+function interiorSamples(body, ring, n = 9) {
+  const b = ring.reduce(
+    (a, [x, y]) => [Math.min(a[0], x), Math.min(a[1], y), Math.max(a[2], x), Math.max(a[3], y)],
+    [Infinity, Infinity, -Infinity, -Infinity]
+  );
+  const out = [];
+  for (let i = 1; i < n; i++) {
+    for (let j = 1; j < n; j++) {
+      const lon = b[0] + ((b[2] - b[0]) * i) / n;
+      const lat = b[1] + ((b[3] - b[1]) * j) / n;
+      const v = S.toVec(lat, lon);
+      if (pointInBody(body, v)) out.push(v);
+    }
+  }
+  return out;
+}
 import { NAMES } from "./names.js";
 import { region } from "./region.js";
 
@@ -33,9 +98,20 @@ export class Game {
     this.playerRing = playerRing;
     this.player = createBody([playerRing]);
     // 押せるかどうかは面積で決まり、プレイ中は変わらないので最初に一度だけ判定する。
+    // 押せない陸は**壁**になる（§1b.8）。
     for (const b of landBodies) b.pushable = b.area <= this.player.area;
+    this.barriers = landBodies.filter((b) => !b.pushable);
     // 当たり判定に使う海岸線頂点（元の jpPts）。元の経緯度も持つ（上陸地域の判定用）。
     this.localPts = playerRing.map(([lon, lat]) => ({ v: S.toVec(lat, lon), lon, lat }));
+    // 壁との判定には**内部の点**も要る。海岸線の頂点だけだと、細長い半島を
+    // 台湾がまたいだときに「どの頂点も壁の内側でない」状態になりすり抜ける。
+    // 壁の判定は**辺と辺の交差**で見るので、海岸線だけでよい（内部の点は要らない）。
+    // 交差で見れば、細い岬を台湾がまたいだ場合も辺が必ず交わるので取りこぼさない。
+    // 1 フレームの最大移動の半分（約 6.4 km）で取り直して、辺の数を抑える。
+    this.blockPts = resampleRing(playerRing, (CFG.PLAYER_SPD * CFG.DT_MAX) / 2);
+    this.nCoastBlock = this.blockPts.length;
+    this.blockWorld = this.blockPts.map((v) => [...v]);
+    this.blockLL = new Float64Array(this.blockPts.length * 2);
     this.reset();
   }
 
@@ -67,39 +143,126 @@ export class Game {
   updateWorldPts() {
     const q = this.player.q;
     for (let i = 0; i < this.localPts.length; i++) S.quatApply(q, this.localPts[i].v, this.worldPts[i]);
-  }
-
-  /** 台湾を接平面上の (vx, vy) 方向へ動かす。斜めが √2 倍速いのは元の仕様（§6）。 */
-  movePlayer(dt) {
-    if (!this.vx && !this.vy) return;
-    const { east, north } = S.tangentBasis(this.pos);
-    const dir = [
-      east[0] * this.vx - north[0] * this.vy,
-      east[1] * this.vx - north[1] * this.vy,
-      east[2] * this.vx - north[2] * this.vy,
-    ];
-    const len = Math.hypot(dir[0], dir[1], dir[2]);
-    if (len < 1e-9) return;
-    const speed = CFG.PLAYER_SPD * len; // len が入力の強さ。斜めは √2 になる
-    // 軸 n = pos × dir のまわりに **正の** 角度で回すと pos が dir 側へ動く。
-    // (n×pos = dir なので p' = p cosθ + dir sinθ)。符号を逆にすると西へ行く。
-    const axis = S.cross(this.pos, [dir[0] / len, dir[1] / len, dir[2] / len]);
-    S.normalize(axis);
-    const dq = S.quatFromAxisAngle(axis, speed * dt * S.DEG);
-    this.q = S.quatMul(dq, this.q);
-    this.player.q = this.q;
-    this.player._dirty = true;
-    S.quatApply(dq, this.pos, this.pos);
-    S.normalize(this.pos);
+    for (let i = 0; i < this.blockPts.length; i++) S.quatApply(q, this.blockPts[i], this.blockWorld[i]);
   }
 
   /**
-   * 台風を発生させる。
-   * 基準はカメラの現在画角ではなく **プレイ画角（CFG.CAM_PLAY）** に固定する。
-   * カメラの都合（イントロの引き画など）で発生距離が変わると、
-   * 開始直後に画面外遠くへ湧いてそのまま消える、といった事故が起きる。
-   * ルール層がカメラの状態を見ないという層構造（§0.3）にも合う。
+   * 台湾を接平面上の (vx, vy) 方向へ動かす。斜めが √2 倍速いのは元の仕様（§6）。
+   *
+   * 自分より大きい陸は**壁**なので、めり込む移動は却下する（§1b.8）。
+   * 却下されたら東成分だけ・北成分だけを順に試す。
+   * これで壁に沿って滑れる。全部だめなら止まる。
    */
+  movePlayer(dt) {
+    if (!this.vx && !this.vy) return;
+    const { east, north } = S.tangentBasis(this.pos);
+    const comp = (vx, vy) => [
+      east[0] * vx - north[0] * vy,
+      east[1] * vx - north[1] * vy,
+      east[2] * vx - north[2] * vy,
+    ];
+    // すでに壁の中にいるなら閉じ込めない（初期配置や不測の事態への保険）
+    const stuck = this.blockedBy(null);
+    for (const [vx, vy] of [[this.vx, this.vy], [this.vx, 0], [0, this.vy]]) {
+      if (!vx && !vy) continue;
+      const dir = comp(vx, vy);
+      const len = Math.hypot(dir[0], dir[1], dir[2]);
+      if (len < 1e-9) continue;
+      const speed = CFG.PLAYER_SPD * len; // len が入力の強さ。斜めは √2 になる
+      // 軸 n = pos × dir のまわりに **正の** 角度で回すと pos が dir 側へ動く。
+      // (n×pos = dir なので p' = p cosθ + dir sinθ)。符号を逆にすると西へ行く。
+      const axis = S.cross(this.pos, [dir[0] / len, dir[1] / len, dir[2] / len]);
+      S.normalize(axis);
+      const dq = S.quatFromAxisAngle(axis, speed * dt * S.DEG);
+      if (!stuck && this.blockedBy(dq)) continue;
+      this.q = S.quatMul(dq, this.q);
+      this.player.q = this.q;
+      this.player._dirty = true;
+      S.quatApply(dq, this.pos, this.pos);
+      S.normalize(this.pos);
+      this.updateWorldPts();
+      return;
+    }
+  }
+
+  /**
+   * dq を適用した後の台湾が、壁（押せない陸）にめり込むか。
+   * dq が null なら現在位置で判定する。
+   */
+  blockedBy(dq) {
+    const center = dq ? S.quatApply(dq, this.pos, TMP_C) : this.pos;
+    const c = S.toLatLon(center);
+    const pad = this.player.radius;
+
+    for (const b of this.barriers) {
+      // 1) 粗く弾く。ユーラシアのような巨大な陸は外接キャップが効かないので bbox で見る。
+      if (c.lat < b.bbox[1] - pad || c.lat > b.bbox[3] + pad) continue;
+      if (!b.wrapsLon) {
+        let d = c.lon - (b.bbox[0] + b.bbox[2]) / 2;
+        while (d > 180) d -= 360;
+        while (d < -180) d += 360;
+        if (Math.abs(d) > (b.bbox[2] - b.bbox[0]) / 2 + pad) continue;
+      }
+      // 2) 海岸線から離れていれば、台湾は丸ごと内側か丸ごと外側。中心 1 点で決まる。
+      if (!coastNear(b, c.lon - pad, c.lat - pad, c.lon + pad, c.lat + pad)) {
+        if (pointInBody(b, center)) return true;
+        continue;
+      }
+      // 3) 近傍の辺だけ集めて、台湾の海岸線と交差するかを見る。
+      const E = edgesNear(b, c.lon, c.lon - pad, c.lat - pad, c.lon + pad, c.lat + pad, TMP_EDGES);
+      const P = this.blockLonLat(dq, c.lon);
+      const n = this.nCoastBlock * 2;
+      for (let i = 0; i < n; i += 2) {
+        const ax = P[i];
+        const ay = P[i + 1];
+        const bx = P[(i + 2) % n];
+        const by = P[(i + 3) % n];
+        for (let j = 0; j < E.length; j += 4) {
+          if (segCross(ax, ay, bx, by, E[j], E[j + 1], E[j + 2], E[j + 3])) return true;
+        }
+      }
+      // 4) 交差が無いなら、丸ごと内側か丸ごと外側。中心で決める。
+      if (pointInBody(b, center)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * 台湾を指定の経緯度へ移す。
+   * **pos だけ書き換えてはいけない。** 島の形は player.q が持っているので、
+   * 両方に同じ回転を掛けないと「中心はここ、島はあそこ」という状態になる。
+   */
+  teleport(lat, lon) {
+    const target = S.toVec(lat, lon);
+    const axis = S.cross(this.pos, target);
+    const len = Math.hypot(axis[0], axis[1], axis[2]);
+    if (len > 1e-12) {
+      S.normalize(axis);
+      const dq = S.quatFromAxisAngle(axis, S.angle(this.pos, target));
+      this.q = S.quatMul(dq, this.q);
+      this.player.q = this.q;
+      this.player._dirty = true;
+    }
+    this.pos = target;
+    this.updateWorldPts();
+    return this;
+  }
+
+  /** 壁の判定に使う海岸線を、refLon と同じ枝の経緯度で得る。 */
+  blockLonLat(dq, refLon) {
+    const out = this.blockLL;
+    for (let i = 0; i < this.nCoastBlock; i++) {
+      const w = dq ? S.quatApply(dq, this.blockWorld[i], TMP_P) : this.blockWorld[i];
+      const y = w[1] < -1 ? -1 : w[1] > 1 ? 1 : w[1];
+      out[i * 2 + 1] = Math.asin(y) / S.DEG;
+      let lon = Math.atan2(w[0], w[2]) / S.DEG - refLon;
+      while (lon > 180) lon -= 360;
+      while (lon < -180) lon += 360;
+      out[i * 2] = lon + refLon;
+    }
+    return out;
+  }
+
   spawn(visibleDeg = CFG.CAM_PLAY) {
     this.tyNo++;
     const name = NAMES[this.nameIdx % NAMES.length];

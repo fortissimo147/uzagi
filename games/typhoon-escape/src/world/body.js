@@ -102,9 +102,24 @@ export function createBody(rings) {
   let area = ringArea(rings[0]);
   for (let i = 1; i < rings.length; i++) area -= ringArea(rings[i]);
 
+  // 経緯度の bbox。巨大な陸は外接キャップが半球を超えて役に立たないので、
+  // 壁の判定ではこちらで粗く弾く（§1b.8）。
+  const bbox = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const [lon, lat] of rings[0]) {
+    if (lon < bbox[0]) bbox[0] = lon;
+    if (lat < bbox[1]) bbox[1] = lat;
+    if (lon > bbox[2]) bbox[2] = lon;
+    if (lat > bbox[3]) bbox[3] = lat;
+  }
+  // 日付変更線をまたぐ陸は経度で弾けない
+  const wrapsLon = bbox[0] <= -179.99 && bbox[2] >= 179.99;
+
   return {
     rings,
     area, // ステラジアン
+    bbox,
+    wrapsLon,
+    coastCells: null, // 必要になったときに作る（壁になる 43 個しか使わない）
     index: buildIndex(rings),
     center: c, // 元の姿勢での重心
     radius, // 角半径[度]
@@ -141,6 +156,44 @@ export function bodyCenter(b) {
 const RAY_EPS = 1e-5;
 
 /**
+ * 海岸線がどの 1 度セルを通るかの集合を作る（§1b.8）。
+ *
+ * ユーラシアのように bbox が全球に及ぶ陸は、bbox でも外接キャップでも弾けず、
+ * 外洋にいても毎フレーム全点を判定してしまう。海岸線から離れていることが
+ * 1 回の判定で分かれば、あとは中心 1 点を見るだけで済む。
+ */
+export function buildCoastCells(rings) {
+  const cells = new Set();
+  const key = (lon, lat) => (Math.floor(lat + 90) << 9) | (Math.floor(((lon + 180) % 360 + 360) % 360));
+  for (const r of rings) {
+    for (let i = 0; i < r.length; i++) {
+      const a = r[i];
+      const b = r[(i + 1) % r.length];
+      cells.add(key(a[0], a[1]));
+      // 1 度より長い辺はセルを飛ばしうるので途中も打つ
+      let d = b[0] - a[0];
+      while (d > 180) d -= 360;
+      while (d < -180) d += 360;
+      const n = Math.ceil(Math.max(Math.abs(d), Math.abs(b[1] - a[1])));
+      for (let k = 1; k < n; k++) cells.add(key(a[0] + (d * k) / n, a[1] + ((b[1] - a[1]) * k) / n));
+    }
+  }
+  return cells;
+}
+
+/** 経緯度の矩形が海岸線のセルに触れるか。セル集合は初回に作る。 */
+export function coastNear(b, lonMin, latMin, lonMax, latMax) {
+  if (!b.coastCells) b.coastCells = buildCoastCells(b.rings);
+  for (let lat = Math.floor(latMin); lat <= Math.floor(latMax); lat++) {
+    for (let lon = Math.floor(lonMin); lon <= Math.floor(lonMax); lon++) {
+      const k = ((lat + 90) << 9) | ((((lon + 180) % 360) + 360) % 360);
+      if (b.coastCells.has(k)) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * 単位ベクトル p が陸塊の内側にあるか。
  * p を陸塊のローカル座標へ戻してから、子午線に沿ったレイキャストで判定する。
  * 極を囲むリング（南極）に対してもそのまま正しく動く。
@@ -165,6 +218,43 @@ export function pointInBody(b, p) {
     if (lat0[e] + t * dLa[e] > lat) inside = !inside;
   }
   return inside;
+}
+
+/**
+ * 経緯度の矩形に重なる辺を集める（§1b.8）。
+ *
+ * 壁の判定で「点が内側か」を全点について解くと、子午線レイが経度バケットの
+ * 全辺（ユーラシアで千本規模）を舐めることになり重い（実測 1.4 ms）。
+ * 近傍の辺だけ集めて**辺と辺の交差**を見るほうが速く、しかもすり抜けに強い。
+ *
+ * 返すのは [lonA, latA, lonB, latB, ...] の平坦な配列。
+ * 経度は refLon と同じ枝へ巻き戻してあるので、そのまま平面として扱ってよい。
+ */
+export function edgesNear(b, refLon, lonMin, latMin, lonMax, latMax, out = []) {
+  const { lon0, lat0, dLo, dLa, start, items } = b.index;
+  out.length = 0;
+  const k0 = Math.floor(((((lonMin + 180) % 360) + 360) % 360) / BW);
+  const k1 = Math.floor(((((lonMax + 180) % 360) + 360) % 360) / BW);
+  const n = ((k1 - k0 + BUCKETS) % BUCKETS) + 1;
+  const seen = new Set();
+  for (let j = 0; j < n; j++) {
+    const k = (k0 + j) % BUCKETS;
+    for (let i = start[k], end = start[k + 1]; i < end; i++) {
+      const e = items[i];
+      if (seen.has(e)) continue;
+      const la = lat0[e];
+      const lb = la + dLa[e];
+      if (Math.max(la, lb) < latMin || Math.min(la, lb) > latMax) continue;
+      let a = lon0[e] - refLon;
+      while (a > 180) a -= 360;
+      while (a < -180) a += 360;
+      const bb = a + dLo[e];
+      if (Math.max(a, bb) < lonMin - refLon || Math.min(a, bb) > lonMax - refLon) continue;
+      seen.add(e);
+      out.push(a + refLon, la, bb + refLon, lb);
+    }
+  }
+  return out;
 }
 
 /**

@@ -92,11 +92,20 @@ export const CFG = {
   // --- カメラ（§5.2） ---
   PLAY_W: px(ORIG.W),
   PLAY_H: px(ORIG.H),
+  /** プレイ窓の縦横比（元ゲームの 400:700）。カメラはこの比の窓を必ず収める。 */
+  WINDOW_ASPECT: ORIG.W / ORIG.H,
+  /**
+   * 画角の拡大率（本作の選択）。1.0 で元ゲームと同じ窓。
+   * スマホの縦長画面では元の窓でも見える範囲が狭く感じるため 1.3 にした。§5.2b
+   * 難度そのもの（速度・半径・発生間隔）には影響しない。
+   * 台風の発生・消滅の距離は画角に追随するので、湧いて出る見え方も変わらない。
+   */
+  VIEW_SCALE: 1.3,
   get CAM_PLAY() {
-    return this.PLAY_H / 2;
+    return (this.PLAY_H / 2) * this.VIEW_SCALE;
   },
   get CAM_FLOOR() {
-    return this.PLAY_H / 4;
+    return this.CAM_PLAY / 2;
   },
   CAM_WORLD: 90,
   CAM_SMOOTH: 4, // 1 - exp(-k dt)

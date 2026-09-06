@@ -19,30 +19,62 @@ export class FollowCamera {
     this.aspect = 1;
   }
 
+  /** 縦の画角の半分[rad]。 */
+  get fovV() {
+    return (this.cam.fov * S.DEG) / 2;
+  }
+  /** 横の画角の半分[rad]。縦長の画面ではこちらのほうが狭い。 */
+  get fovH() {
+    return Math.atan(Math.tan(this.fovV) * (this.cam.aspect || 1));
+  }
+
+  /** 弧 arcDeg を画角の半分 half に収めるカメラ距離。d = cos ρ + sin ρ / tan(half)。 */
+  static fit(arcDeg, half) {
+    const h = arcDeg * S.DEG;
+    return R * (Math.sin(h) / Math.tan(half) + Math.cos(h));
+  }
+
   /**
-   * 可視角半径[度]からカメラ距離を決める。縦方向の画角に合わせる。
+   * 距離 d のとき、画角の半分 half の方向に見える地表の弧[度]。
+   * sin(ρ + half) = d·sin(half) を解く。地平線に届く場合は acos(1/d) で頭打ち。
+   */
+  static arcAt(d, half) {
+    const s = (d / R) * Math.sin(half);
+    return (s <= 1 ? Math.asin(s) - half : Math.acos(R / d)) / S.DEG;
+  }
+
+  /**
+   * 可視角半径[度]からカメラ距離を決める。
    *
-   * 球の中心を原点、カメラを距離 d に置くと、地表の弧 v の点が視線となす角は
-   * atan(sin v / (d - cos v))。これを画角の半分 φ に等しくすると
-   *   d = cos v + sin v / tan φ
-   * v → 90 度で d → 1/tan φ = 2.41R となり、地平線が画面いっぱいになる。
-   * ただしそれだと球が画面をはみ出して「地球儀」に見えないので、
-   * 70 度から先はタイトル用の引き（3.2R）へなめらかに繋ぐ。
+   * **縦だけに合わせてはいけない。** 縦長の画面では横の画角のほうが狭く、
+   * 元ゲームの窓（400:700）より横が狭くなる。実測で iPhone 相当の 390x844 では
+   * 横幅が 924 km となり、元の 1179 km より 22% 狭かった。
+   * 縦と横の両方で必要な距離を出し、**遠いほう**を採る。
+   *
+   * 70 度から先はタイトル用の引き（球が丸ごと収まる距離）へなめらかに繋ぐ。
    */
   distanceFor(visibleDeg) {
-    const fov = (this.cam.fov * S.DEG) / 2;
-    const at = (deg) => {
-      const h = deg * S.DEG;
-      return R * (Math.sin(h) / Math.tan(fov) + Math.cos(h));
-    };
     const WIDE = 70;
+    const at = (v) => Math.max(FollowCamera.fit(v, this.fovV), FollowCamera.fit(v * this.cfg.WINDOW_ASPECT, this.fovH));
     if (visibleDeg <= WIDE) return at(visibleDeg);
-    // タイトルの引き画は「球が画面に丸ごと収まる」ように決める。縦画面では
-    // 横のほうが画角が狭いので、狭いほうに合わせないと左右が切れる。
-    const hHalf = Math.atan(Math.tan(fov) * (this.cam.aspect || 1));
-    const fit = R / Math.sin(Math.min(fov, hHalf) * 0.86);
+    const fit = R / Math.sin(Math.min(this.fovV, this.fovH) * 0.86);
     const t = Math.min(1, (visibleDeg - WIDE) / (90 - WIDE));
     return at(WIDE) + (fit - at(WIDE)) * t;
+  }
+
+  /**
+   * 通常プレイ時に実際に見えている地表の角半径[度]（画面の隅まで）。
+   * 台風の発生・消滅の基準に使う。カメラの瞬間値ではなく **PLAY 段の値**を使うので、
+   * イントロの引き画に引きずられない。画面の形で変わるが、
+   * 難度そのもの（速度・半径・発生間隔）は変わらない。
+   */
+  get playArc() {
+    const d = this.distanceFor(this.cfg.CAM_PLAY);
+    const corner = Math.atan(Math.hypot(Math.tan(this.fovV), Math.tan(this.fovH)));
+    // 横長の画面では隅が地平線近くまで届き、発生距離が伸びて**難度が画面の形で変わって
+    // しまう**（横向き 844x390 で隅 ±47.6°）。ゲーム側の基準は上限で頭打ちにする。
+    // 縦画面では頭打ちに掛からないので、素直に「画面のすぐ外から湧く」ままになる。
+    return Math.min(FollowCamera.arcAt(d, corner), this.cfg.CAM_PLAY * 1.6);
   }
 
   /**

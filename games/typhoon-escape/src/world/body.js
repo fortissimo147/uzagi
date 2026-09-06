@@ -64,6 +64,23 @@ function buildIndex(rings) {
 }
 
 /**
+ * 球面多角形の面積（ステラジアン）。Chamberlain & Duquette の式。
+ * 「自分より大きい陸は押せない」という判定に使う。
+ */
+export function ringArea(ring) {
+  let s = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const [x1, y1] = ring[i];
+    const [x2, y2] = ring[(i + 1) % ring.length];
+    let d = (x2 - x1) * S.DEG;
+    if (d > Math.PI) d -= 2 * Math.PI;
+    else if (d < -Math.PI) d += 2 * Math.PI;
+    s += d * (2 + Math.sin(y1 * S.DEG) + Math.sin(y2 * S.DEG));
+  }
+  return Math.abs(s / 2);
+}
+
+/**
  * 陸塊を作る。
  * @param {[number,number][][]} rings 経緯度のリング群（rings[0] が外周）
  */
@@ -81,8 +98,13 @@ export function createBody(rings) {
   S.normalize(c);
   let radius = 0;
   for (const r of rings[0]) radius = Math.max(radius, S.angleDeg(c, S.toVec(r[1], r[0])));
+  // 外周の面積から穴を引く。押せる／押せないの判定に使う（§1b.6）。
+  let area = ringArea(rings[0]);
+  for (let i = 1; i < rings.length; i++) area -= ringArea(rings[i]);
+
   return {
     rings,
+    area, // ステラジアン
     index: buildIndex(rings),
     center: c, // 元の姿勢での重心
     radius, // 角半径[度]

@@ -171,6 +171,39 @@ section("視界外での消滅（§1b.4）");
   check("視界のすぐ外は、未進入なら消えない（元の -150px 相当まで待つ）", St.outOfPlay(st2, TAIPEI, visible, CFG) === false);
 }
 
+section("渦の回転（§4.3）");
+{
+  const st = mk();
+  st.timer = 999;
+  const r0 = st.rot;
+  St.stepStorm(st, 1, TAIPEI, CFG.STORM_SPD0, CFG, () => 0.99);
+  near("北半球では 1 秒で +SPIN だけ回る（反時計回り）", st.rot - r0, CFG.SPIN, 1e-9);
+}
+{
+  const st = St.createStorm({ pos: S.toVec(-20, 130), bearing: 0, pattern: PATTERNS[0], cfg: CFG, rand: rng(7), no: 1, name: "x" });
+  st.timer = 999;
+  const r0 = st.rot;
+  St.stepStorm(st, 1, S.toVec(-25, 130), CFG.STORM_SPD0, CFG, () => 0.99);
+  near("南半球では逆向きに回る（時計回り）", st.rot - r0, -CFG.SPIN, 1e-9);
+}
+{
+  const a = mk();
+  const b = St.createStorm({ pos: S.toVec(20, 130), bearing: 0, pattern: PATTERNS[0], cfg: CFG, rand: rng(99), no: 2, name: "y" });
+  check("個体ごとに回転位相がずれている（全部同じ向きで揃わない）", a.rot !== b.rot, `${a.rot} / ${b.rot}`);
+  check("初期位相は 0〜2π", [a, b].every((s) => s.rot >= 0 && s.rot < Math.PI * 2));
+}
+{
+  // 回転しながら進むこと（位置と回転の両方が変わる）
+  const st = mk();
+  st.timer = 999;
+  const p0 = [...st.p];
+  const r0 = st.rot;
+  for (let i = 0; i < 20; i++) St.stepStorm(st, 0.05, TAIPEI, CFG.STORM_SPD0, CFG, () => 0.99);
+  check("進んでいる", S.angleDeg(p0, st.p) > 0.5, `${S.angleDeg(p0, st.p).toFixed(3)} 度`);
+  check("同時に回っている", Math.abs(st.rot - r0) > 0.5, `${(st.rot - r0).toFixed(3)} rad`);
+}
+near("1 回転にかかる時間が 6 秒（＝ゲーム内 6 日）", (2 * Math.PI) / CFG.SPIN, 6, 1e-9);
+
 section("極でも壊れないこと");
 {
   const st = St.createStorm({ pos: S.toVec(89.5, 0), bearing: 0, pattern: PATTERNS[0], cfg: CFG, rand: rng(9), no: 1, name: "x" });

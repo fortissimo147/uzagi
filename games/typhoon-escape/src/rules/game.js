@@ -32,6 +32,8 @@ export class Game {
     this.landBodies = landBodies;
     this.playerRing = playerRing;
     this.player = createBody([playerRing]);
+    // 押せるかどうかは面積で決まり、プレイ中は変わらないので最初に一度だけ判定する。
+    for (const b of landBodies) b.pushable = b.area <= this.player.area;
     // 当たり判定に使う海岸線頂点（元の jpPts）。元の経緯度も持つ（上陸地域の判定用）。
     this.localPts = playerRing.map(([lon, lat]) => ({ v: S.toVec(lat, lon), lon, lat }));
     this.reset();
@@ -127,6 +129,7 @@ export class Game {
       for (const st of this.storms) {
         const v = st.stalled ? this.tsp * CFG.STALL_FACTOR : this.tsp * st.spd;
         S.advance(st.p, st.t, v * d * S.DEG);
+        st.rot += (st.p[1] >= 0 ? 1 : -1) * CFG.SPIN * d;
       }
       return;
     }
@@ -135,10 +138,12 @@ export class Game {
     this.movePlayer(dt);
     this.updateWorldPts();
 
-    // 押しのけ（§1.8）
+    // 押しのけ（§1.8 / §1b.6）。
+    // **自分より面積の大きい陸は押せない**。台湾（35,938 km²）で大陸が動くのは
+    // さすがに無理があるので、質量の代わりに面積で線を引く。
     const pc = this.pos;
     for (const b of this.landBodies) {
-      pushBody(b, this.worldPts, pc, this.player.radius, CFG);
+      if (b.pushable) pushBody(b, this.worldPts, pc, this.player.radius, CFG);
       slideBody(b, dt, CFG);
     }
 

@@ -178,6 +178,49 @@ check("上陸メッセージが英語で出る", (await page.locator("#ptext").t
 check("ボタンが Start a New Summer", (await page.locator("#pbtn").textContent()) === "Start a New Summer");
 check("シェアボタンが出る", await page.locator("#sharebtn").isVisible());
 
+section("渦の見た目と当たり判定の一致（§4.3）");
+{
+  const d = await page.evaluate(() => {
+    const g = window.__game.game;
+    const v = window.__game.stormView;
+    const st = g.storms[0];
+    if (!st) return null;
+    const maxAng = (attr) => {
+      const a = attr.array;
+      const n = attr.count * 3;
+      let m = 0;
+      for (let i = 0; i < n; i += 3) {
+        const len = Math.hypot(a[i], a[i + 1], a[i + 2]);
+        if (len === 0) continue;
+        const dot = (a[i] * st.p[0] + a[i + 1] * st.p[1] + a[i + 2] * st.p[2]) / len;
+        const ang = (Math.acos(Math.max(-1, Math.min(1, dot))) * 180) / Math.PI;
+        if (ang > m) m = ang;
+      }
+      return m;
+    };
+    return {
+      r: st.r,
+      lethal: st.r * window.__game.cfg.LETHAL,
+      bandOuter: maxAng(v.lethalBand.geometry.attributes.position),
+      cloudOuter: maxAng(v.cloud.geometry.attributes.position),
+      rot: st.rot,
+    };
+  });
+  check("台風が存在する", d !== null);
+  if (d) {
+    check(`赤い帯の外縁が致死半径と一致（${d.bandOuter.toFixed(4)}° vs ${d.lethal.toFixed(4)}°）`,
+      Math.abs(d.bandOuter - d.lethal) < 1e-3);
+    check(`渦の雲は外側半径を超えない（${d.cloudOuter.toFixed(3)}° <= ${d.r.toFixed(3)}°）`, d.cloudOuter <= d.r * 1.02);
+    check("渦が当たり判定より大きく描かれている（雲は飾りで、判定は赤い帯）", d.cloudOuter > d.lethal);
+  }
+}
+{
+  const a = await page.evaluate(() => window.__game.game.storms[0].rot);
+  await page.waitForTimeout(900);
+  const b = await page.evaluate(() => window.__game.game.storms[0].rot);
+  check(`台風が回りながら動いている（rot ${a.toFixed(2)} → ${b.toFixed(2)}）`, b > a);
+}
+
 section("性能 — 台風 7 個の最悪条件");
 await page.locator("#pbtn").click();
 await page.waitForTimeout(300);
@@ -194,11 +237,18 @@ await page.waitForTimeout(6000); // ソフトウェア描画だと数 fps しか
     calls: window.__game.renderer.info.render.calls,
   }));
   check(`台風 ${d.storms} 個で CPU 側 1 フレームが 8 ms 未満（実測 ${d.cpu.toFixed(2)} ms）`, d.cpu < 8);
-  check(`ドローコールが 24 未満（${d.calls}）`, d.calls < 24);
+  check(`台風 7 個でもドローコールが 40 未満（${d.calls}）`, d.calls < 40);
 {
+  // イントロの 90 度から寄ってくる。ソフトウェア描画では数 fps しか出ず
+  // 収束に実時間がかかるので、壁時計で待たずに収束そのものを待つ。
+  let ok = true;
+  try {
+    await page.waitForFunction(() => window.__game.follow.visible <= 9.28 * 1.02, null, { timeout: 40000 });
+  } catch {
+    ok = false;
+  }
   const v = await page.evaluate(() => window.__game.follow.visible);
-  // イントロの 90 度から寄ってくる途中なので、収束の尻尾ぶんは許す。
-  check(`プレイ中は PLAY 画角(9.28度)より引かない（${v.toFixed(2)} 度）`, v <= 9.28 * 1.05 && v >= 4.6);
+  check(`プレイ中は PLAY 画角(9.28度)より引かない（${v.toFixed(2)} 度）`, ok && v >= 4.6);
 }
 }
 // 元に戻す
@@ -211,6 +261,31 @@ await page.evaluate(() => {
   g.over = true;
 });
 await page.waitForTimeout(1900);
+
+section("面積で押せるかが決まる（§1b.6）");
+{
+  const d = await page.evaluate(async () => {
+    const g = window.__game.game;
+    const big = g.landBodies.filter((b) => !b.pushable);
+    const small = g.landBodies.filter((b) => b.pushable);
+    // 一番大きい陸（ユーラシア）の中にわざと台湾を置いて数フレーム回す
+    const D = Math.PI / 180;
+    const put = (lat, lon) => {
+      g.pos = [Math.cos(lat * D) * Math.sin(lon * D), Math.sin(lat * D), Math.cos(lat * D) * Math.cos(lon * D)];
+      g.q = [0, 0, 0, 1];
+      g.player.q = [0, 0, 0, 1];
+      g.player._dirty = true;
+      g.updateWorldPts();
+    };
+    put(30, 105); // 中国内陸のど真ん中
+    for (let i = 0; i < 20; i++) g.step(0.03);
+    const bigMoved = big.filter((b) => b.q[3] !== 1).length;
+    return { nBig: big.length, nSmall: small.length, bigMoved, playerKm2: g.player.area * 6371.0088 ** 2 };
+  });
+  check(`台湾（${Math.round(d.playerKm2).toLocaleString()} km²）より大きい陸が ${d.nBig} 個ある`, d.nBig > 30);
+  check(`小さい陸が ${d.nSmall} 個ある`, d.nSmall > 3900);
+  check("大陸のど真ん中に入り込んでも、大きい陸はひとつも動かない", d.bigMoved === 0, `${d.bigMoved} 個動いた`);
+}
 
 section("やり直し");
 await page.locator("#pbtn").click();

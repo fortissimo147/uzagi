@@ -74,6 +74,12 @@ export const CFG = {
   SLIDE_DAMP: 0.12, // ^dt
   SLIDE_CUTOFF: px(0.5),
 
+  // --- 渦の見た目（§4.3） ---
+  SPIN: (2 * Math.PI) / 6, // 6 秒で 1 回転[rad/s]。北半球は反時計回り、南半球は時計回り
+  ARMS: 5, // 渦の腕の本数
+  SPIRAL_B: 0.26, // 対数螺旋 r = a·e^(bθ) の巻きの強さ
+  EYE: 0.13, // 眼の半径 / 外側半径
+
   // --- カメラ（§5.2） ---
   PLAY_W: px(ORIG.W),
   PLAY_H: px(ORIG.H),

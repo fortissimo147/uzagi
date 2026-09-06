@@ -82,6 +82,46 @@ const bodies = land.map((p) => createBody(p.rings));
   check("台湾本島の位置は陸レイヤから除かれている（自国の影がない）", !anyLand(23.76, 120.9));
 }
 
+section("面積で押せるかを決める（§1b.6）");
+{
+  const R_KM = 6371.0088;
+  const player = createBody([loadPlayerRing()]);
+  const km2 = (b) => b.area * R_KM * R_KM;
+  near("台湾本島の面積 35,938 km²", km2(player), 35938, 5);
+
+  for (const b of bodies) b.pushable = b.area <= player.area;
+  const movable = bodies.filter((b) => b.pushable).length;
+  check(`可動 ${movable} / 不動 ${bodies.length - movable}`, movable > 3900 && bodies.length - movable > 30);
+  check("自分より大きい陸はひとつも押せない扱いになる",
+    bodies.every((b) => b.pushable === b.area <= player.area));
+
+  // bbox で実在の島を特定して、可動／不動が直感と合うか見る
+  const find = (lo, la, lo2, la2) =>
+    bodies.find((b, i) => {
+      const x = land[i].bbox;
+      return Math.abs(x[0] - lo) < 0.4 && Math.abs(x[1] - la) < 0.4 && Math.abs(x[2] - lo2) < 0.4 && Math.abs(x[3] - la2) < 0.4;
+    });
+  const cases = [
+    ["ユーラシア＋アフリカ", -180, -34.82, 179.96, 77.74, false],
+    ["南北アメリカ", -168.14, -53.89, -34.79, 72.0, false],
+    ["南極大陸", -180, -85.22, 179.79, -63.21, false],
+    ["オーストラリア", 113.16, -39.15, 153.63, -10.69, false],
+    ["本州", 130.86, 33.43, 142.07, 41.55, false],
+    ["九州（台湾より少し大きい）", 129.55, 31.0, 132.08, 33.97, false],
+    ["四国", 132.01, 32.71, 134.75, 34.39, true],
+    ["海南島（台湾より少し小さい）", 108.61, 18.17, 111.03, 20.16, true],
+    ["シチリア島", 12.43, 36.65, 15.65, 38.3, true],
+  ];
+  for (const [name, a, b2, c, d, want] of cases) {
+    const body = find(a, b2, c, d);
+    if (!body) {
+      check(`${name} が見つかる`, false, "bbox 不一致");
+      continue;
+    }
+    check(`${name} は${want ? "押せる" : "押せない"}（${(km2(body) / 1e4).toFixed(2)} 万km²）`, body.pushable === want);
+  }
+}
+
 section("押しのけ（§1.8 の球面版）");
 {
   const ring = loadPlayerRing();
@@ -105,7 +145,7 @@ section("押しのけ（§1.8 の球面版）");
   })();
 
   let pushed = 0;
-  for (const b of bodies) if (pushBody(b, moved, movedCenter, player.radius, CFG)) pushed++;
+  for (const b of bodies) if (b.pushable && pushBody(b, moved, movedCenter, player.radius, CFG)) pushed++;
   check("めり込ませた大陸が押される", pushed >= 1, `${pushed} 個`);
   check("遠くの大陸は押されない（外接キャップで早期棄却）", pushed <= 3, `${pushed} 個`);
 
@@ -134,9 +174,10 @@ section("性能 — 毎フレーム回るか（§3.3c）");
   const player = createBody([ring]);
   const pts = ring.map(([lon, lat]) => S.toVec(lat, lon));
   const pc = bodyCenter(player);
+  for (const b of bodies) b.pushable = b.area <= player.area;
   const t0 = Date.now();
   const N = 60;
-  for (let k = 0; k < N; k++) for (const b of bodies) pushBody(b, pts, pc, player.radius, CFG);
+  for (let k = 0; k < N; k++) for (const b of bodies) if (b.pushable) pushBody(b, pts, pc, player.radius, CFG);
   const ms = (Date.now() - t0) / N;
   check(`押しのけ判定 1 フレームが 5 ms 未満（実測 ${ms.toFixed(2)} ms）`, ms < 5);
 }

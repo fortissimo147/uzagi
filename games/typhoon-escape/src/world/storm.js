@@ -32,6 +32,7 @@ export function createStorm({ pos, bearing, pattern, cfg, rand, no, name }) {
     life: cfg.LIFE_MIN + rand() * cfg.LIFE_RAND,
     spd: pat.spd * (0.8 + rand() * 0.4),
     stalled: false,
+    rot: rand() * Math.PI * 2, // 渦の回転位相。個体ごとにばらす
     timer: pat.segMin + rand() * (pat.segMax - pat.segMin),
     trail: [[...p]],
     forecast: null,
@@ -101,6 +102,8 @@ export function bearingOf(st) {
  * 元の update() の台風部分そのまま（§1.5）。
  */
 export function stepStorm(st, dt, target, tsp, cfg, rand) {
+  // 渦の回転。北半球は反時計回り、南半球は時計回り（実際の低気圧と同じ向き）。
+  st.rot += (st.p[1] >= 0 ? 1 : -1) * cfg.SPIN * dt;
   st.timer -= dt;
   if (st.timer <= 0) retarget(st, target, tsp, cfg, rand);
 

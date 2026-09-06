@@ -104,10 +104,13 @@ function inPoly(pt, ring) {
 const ORIG = {
   W: 400, H: 700, M: 700, LONW: 110,
   PHI_J: 37,   // py(37) — 元ゲームが日本を置いた緯度
-  K: 1.6,      // 自国の拡大率
+  K: 1.6,      // 元ゲームが日本にかけていた拡大率（元の事実。動かさない）
   lethal: 0.55,
 };
 const M = ORIG.M;
+// 本作の設計選択: 台湾本島の描画倍率。1.0 = 実寸（他の陸と同じ縮尺）。
+// ORIG.K とは別物。ORIG.K は元ゲームの事実なので動かさない。
+const K_TW = 1.0;
 
 let bad = 0;
 const ok = (cond, label, detail = "") => {
@@ -148,9 +151,10 @@ console.log(`サイズ比 日本/台湾本島: 外接半径 ${f(rhoJ / rhoT, 4)}
 // ================= 換算定数 =================
 console.log("\n== 換算定数 ==");
 const mJ = (ORIG.W / ORIG.LONW) / Math.cos(ORIG.PHI_J * D); // px / 度(弧長) @ lat37
-const bodyPx = rhoJ * mJ * ORIG.K;                          // 元での自国の描画外接半径 [px]
-const bodyDeg = rhoT * ORIG.K;                              // 球面での自国の描画外接角半径 [°]
+const bodyPx = rhoJ * mJ * ORIG.K;   // 元での自国の描画外接半径 [px]（K=1.6 固定）
+const bodyDeg = rhoT * K_TW;         // 球面での自国の描画外接角半径 [°]（本作の選択）
 const A = bodyDeg / bodyPx;                                 // 度(弧長) / 元px
+console.log(`台湾本島の描画倍率 K_TW = ${f(K_TW, 1)}（元ゲームの日本は K = ${f(ORIG.K, 1)}）`);
 console.log(`元マップの弧長スケール @lat${ORIG.PHI_J} = ${f(mJ)} px/°`);
 console.log(`元での自国の描画外接半径   = ${f(bodyPx, 2)} px`);
 console.log(`球面での自国の描画外接半径 = ${f(bodyDeg)}° = ${f(km(bodyDeg), 1)} km`);
@@ -236,5 +240,18 @@ const dup = [];
 landPolys.forEach((poly, i) => { if (inPoly(cenLonLat, rl50(poly[0]))) dup.push(i); });
 ok(dup.length === 1, "陸レイヤ内の自国ポリゴンを一意に特定できる", `index ${dup.join(",")}`);
 console.log(`  → 陸レイヤは ${landPolys.length} − ${dup.length} = ${landPolys.length - dup.length} ポリゴンになる`);
+
+
+// ================= 描画解像度の妥当性 =================
+console.log("\n== ズーム段と地図解像度（DESIGN.md §3.3・§5.2）==");
+const PLAY = (ORIG.H * A) / 2;      // プレイ窓の縦半分 = 元ゲームと同一の画角
+const FLOOR = PLAY / 2;             // 自動フレーミングの寄り限界
+const VH_PX = 800;                  // 想定ビューポート高さ
+for (const [name, radius] of [["PLAY ", PLAY], ["FLOOR", FLOOR]]) {
+  const kmPerPx = km(2 * radius) / VH_PX;
+  console.log(`  ${name} 可視角半径 ${f(radius)}° → ${f(kmPerPx, 2)} km/px @${VH_PX}px`);
+  for (const [res, med] of [["land-50m", 7.63], ["land-10m", 1.58]])
+    console.log(`      ${res} 辺長中央値 ${med} km = ${f(med / kmPerPx, 2)} px`);
+}
 
 process.exit(bad ? 1 : 0);

@@ -20,6 +20,58 @@ npm run standalone # dist/typhoon-escape.html（1 枚完結・約 2.8 MiB）
 npm test           # 全テスト（Node + 実ブラウザ）
 ```
 
+## 配信（Cloudflare Pages）
+
+`vite.config.js` の `base` が `"./"` なので、`dist/` をどこに置いても動く。
+`public/_headers` にキャッシュの指定、`.nvmrc` に Node の版が入っている。
+**シェア文の URL は実際に開かれている URL から取る**ので、置き場所を決め打ちする設定はない。
+
+サイズは 4 ファイル・計 2.79 MiB（最大 2.78 MiB）。
+Pages の 1 ファイル 25 MiB / 20,000 ファイルの制限には余裕がある。
+`test/deploy.test.mjs` がこれらとサブディレクトリ配信を毎回検査する。
+
+### A. 独立したプロジェクトとして上げる（既定）
+
+```sh
+npm run deploy      # games/typhoon-escape/ で実行
+```
+
+`dist/` を Cloudflare Pages のプロジェクト `typhoon-escape` へ送る。
+終わると `https://typhoon-escape.pages.dev` で開ける。
+
+`pages.dev` の名前は世界共通なので、すでに使われていると弾かれる。
+その場合は `package.json` の `deploy` の `--project-name` を変える。
+
+初回はブラウザで Cloudflare の認可を求められる（2 回目以降は聞かれない）。
+ブラウザの無い所で回すなら `CLOUDFLARE_API_TOKEN` を使う。
+既存の `uzagi` プロジェクトとは別物なので、そちらの配信には影響しない。
+
+**GitHub につないで push で自動デプロイする場合** — 既存の `uzagi` とは別に
+もう 1 つ Pages プロジェクトを作り、次を設定する。
+
+| 項目 | 値 |
+| --- | --- |
+| Root directory | `games/typhoon-escape` **[推定: ダッシュボードの項目名は要確認]** |
+| Framework preset | None |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+
+### B. 既存の `uzagi` にぶら下げる
+
+1 つの URL にまとめたいならこちら。`uzagi.pages.dev/typhoon-escape/` で開けるようになる。
+
+```sh
+# リポジトリのルートで
+npm run build                                   # 既存ゲームを dist/ へ
+(cd games/typhoon-escape && npm run build)      # このゲームを games/typhoon-escape/dist/ へ
+mkdir -p dist/typhoon-escape
+cp -r games/typhoon-escape/dist/* dist/typhoon-escape/
+npx --yes wrangler@4 pages deploy dist --project-name uzagi
+```
+
+サブディレクトリで動くことは `test/deploy.test.mjs` が実際にブラウザで確かめている
+（`/games/typhoon-escape/` に置いて起動し、シェア URL がその場所になることまで見る）。
+
 ## ファイルの役割
 
 | ファイル | 役割 |
@@ -39,6 +91,8 @@ npm test           # 全テスト（Node + 実ブラウザ）
 | `src/data/geo.js` | **生成物**。`npm run bake:geo` で作る。手で編集しない |
 | `tools/calibrate.mjs` | §1b の換算表を実データから再生成（設計値の出所） |
 | `tools/bake-geo.mjs` | world-atlas → `src/data/geo.js` |
+| `tools/standalone.mjs` | `dist/` を 1 枚の HTML に（`dist/typhoon-escape.html`） |
+| `public/_headers` | Cloudflare Pages のキャッシュ指定 |
 
 ## 設計の要点
 

@@ -205,4 +205,16 @@ export class Game {
   }
 }
 
+/**
+ * X へ流すシェア文（§7）。元の日本語文の対訳。
+ * URL は呼び出し側が渡す（実際に開かれている URL から取る）。
+ */
+export function shareText(game, url) {
+  return (
+    `[Game] Move Taiwan and outrun the typhoons!\n` +
+    `On ${game.dateText}, ${game.landfallText()}. I survived ${game.days} days.\n\n` +
+    `#TyphoonEscape\n${url}`
+  );
+}
+
 export { createBody, bodyCenter };

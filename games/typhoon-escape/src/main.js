@@ -9,11 +9,26 @@ import { buildStormView } from "./render/stormview.js";
 import { FollowCamera } from "./render/camera.js";
 import { Input } from "./render/input.js";
 import { Hud } from "./render/hud.js";
-import { Game } from "./rules/game.js";
+import { Game, shareText } from "./rules/game.js";
 import { CFG, COLORS } from "./rules/config.js";
 import { NAMES_DISCLAIMER } from "./rules/names.js";
 
-const SHARE_URL = "https://lovewcycle.com/games/others/typhoon-escape.html";
+/**
+ * シェア文に載せる URL。
+ * ビルド時に決め打ちせず、**実際に開かれている URL から取る**。
+ * Cloudflare Pages のプレビュー URL でも独自ドメインでも、置いた場所がそのまま入る。
+ * （`vite.config.js` の `base: "./"` によりサブディレクトリ配信でも壊れない。）
+ */
+function shareUrl() {
+  try {
+    const u = new URL(window.location.href);
+    u.hash = "";
+    u.search = "";
+    return u.href.replace(/index\.html$/, "");
+  } catch {
+    return window.location.href;
+  }
+}
 
 class App {
   constructor() {
@@ -28,6 +43,8 @@ class App {
     this.follow = new FollowCamera(this.camera, CFG);
 
     this.cfg = CFG; // テストから難度をいじれるようにしておく
+    this.shareUrl = shareUrl;
+    this.shareText = () => shareText(this.game, shareUrl());
     this.hud = new Hud(document, { disclaimer: NAMES_DISCLAIMER });
     this.input = new Input(this.app, document.getElementById("pad"), document.getElementById("knob"));
 
@@ -99,12 +116,7 @@ class App {
   }
 
   share() {
-    const g = this.game;
-    const text =
-      `[Game] Move Taiwan and outrun the typhoons!\n` +
-      `On ${g.dateText}, ${g.landfallText()}. I survived ${g.days} days.\n\n` +
-      `#TyphoonEscape\n${SHARE_URL}`;
-    window.open(`https://x.com/intent/post?text=${encodeURIComponent(text)}`, "_blank");
+    window.open(`https://x.com/intent/post?text=${encodeURIComponent(shareText(this.game, shareUrl()))}`, "_blank");
   }
 
   loop(now) {

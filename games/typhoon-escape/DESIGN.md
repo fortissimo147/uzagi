@@ -915,7 +915,23 @@ games/typhoon-escape/
 | # | 項目 | 状態 |
 | --- | --- | --- |
 | 1 | 音 | **[要確認]** 元ゲームには音がない **[確認済]**。現状は無音。付けるなら WebAudio 合成のみでよいか |
-| 2 | シェアURL | **[要確認]** `src/main.js` の `SHARE_URL` が元ゲームの URL のまま。公開先が決まったら差し替える |
+
+**シェアURL は決着した**（旧 §11.2-2）: 決め打ちをやめ、
+**実際に開かれている URL から実行時に取る**（`src/main.js` の `shareUrl()`。
+クエリとハッシュは落とす）。Cloudflare Pages のプレビュー URL でも独自ドメインでも、
+置いた場所がそのまま入る。`test/deploy.test.mjs` がサブディレクトリ配信で実際に確認する。
+
+### 11.2b 配信（Cloudflare Pages）
+
+`base: "./"` なので `dist/` をどこに置いても動く。置き方は 2 通りあり、README に手順がある。
+
+| | 置き方 | URL |
+| --- | --- | --- |
+| A（既定） | 独立した Pages プロジェクト `typhoon-escape` | `typhoon-escape.pages.dev` |
+| B | 既存の `uzagi` プロジェクトのサブディレクトリ | `uzagi.pages.dev/typhoon-escape/` |
+
+B が成立することは `test/deploy.test.mjs` が実ブラウザで確認している
+（`/games/typhoon-escape/` に置いて起動し、シェア URL がその場所になるところまで）。
 
 ### 11.3 実測値（この環境で）
 
@@ -923,6 +939,7 @@ games/typhoon-escape/
 | --- | --- |
 | ビルド | JS 2.92 MB（gzip 940 KB）+ CSS 3.1 KB |
 | 1ファイル完結版 | 2.79 MiB（元ゲームの HTML は 3.36 MB） |
+| `dist/` | 4 ファイル・計 2.79 MiB（Pages の 25 MiB / 20,000 ファイル制限に余裕） |
 | 三角形分割 | 1.4 秒（Node）／ブラウザの起動待ちに含まれる |
 | 静止時のドローコール | **16** — §4.1b のバッチが効いている |
 | CPU 側 1 フレーム（台風 7 個） | **6.3 ms** |

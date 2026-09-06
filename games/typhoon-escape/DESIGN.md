@@ -400,6 +400,8 @@ t' = -p·sin θ + t·cos θ
   中身は **Natural Earth v4.1.0** ベクタデータの TopoJSON 再配布。
   Natural Earth 本体はパブリックドメイン。**元ゲームが使っているのと同一のパッケージ** **[確認済: §0.1]**
 - npm `topojson-client@3.1.0` — ライセンス **ISC**。デコードにビルド時のみ使用。
+- **台風名は創作**（§7）。実在リストを使わないので、元ゲームにあった
+  気象庁アジア名リストへの帰属表示は**載せない**。代わりに「架空である」旨を明記する。
 
 いずれも devDependency に置き、**実行時には持ち込まない**（焼き込んだ後は不要）。
 `LICENSE` と出典表記を `games/typhoon-escape/CREDITS.md` と、
@@ -692,35 +694,56 @@ right   = north × p
 
 地域名は §1b.5 の 4 種（`Northern` / `Central` / `Southern` / `Eastern Taiwan`）。
 
-**台風名: ローマ字化する方針で確定（ユーザー選択）。ただし本セッションでは出典を取得できなかった。**
+**台風名: 140 個すべて創作に置き換える（ユーザー指示）。**
 
-元は台風名を**カタカナ 140 個**で持っている。英語UIならローマ字表記にすべきだが、
-**140 個のローマ字綴りを記憶で書くことはしない**（誤綴りが 140 個並ぶより、未取得と明記するほうが価値が高い）。
+元は気象庁アジア名のカタカナ 140 個。英語UIに合わせてローマ字化する方針だったが、
+出典 4 件（JMA / 台風委員会 / weathernews / Wikipedia）がすべて `EGRESS_BLOCKED` で
+取得できなかった **[確認済: すべて実行して失敗を確認]**。
+記憶で 140 個の綴りを書くのは論外なので、**架空の名前に全面的に差し替える**。
 
-本セッションで試みた取得先と結果 **[確認済: すべて実行して失敗を確認]**:
+これで **未解決事項が 1 つ消える**。創作なので出典も帰属表示も不要になり、
+実在リストを誤って再現するリスクもゼロになる。
 
-| 出典 | 結果 |
-| --- | --- |
-| `www.jma.go.jp`（気象庁「台風の番号とアジア名の付け方」） | `EGRESS_BLOCKED` |
-| `www.typhooncommittee.org`（ESCAP/WMO 台風委員会 改訂リスト PDF） | `EGRESS_BLOCKED` |
-| `weathernews.jp` | `EGRESS_BLOCKED` |
-| `en.wikipedia.org` | `EGRESS_BLOCKED` |
-| npm レジストリ（リスト同梱パッケージの探索） | 該当パッケージなし |
+`src/rules/names.js` に実装済み **[確認済: 検証スクリプト通過]**:
 
-本セッションの egress ポリシーは事実上パッケージレジストリ以外を遮断している。
-遮断の迂回は禁止されているので、**未取得のまま**とする。
+- **14 グループ × 10 個 = 140 個**（実在リストと同じ構造だけ踏襲）
+- 重複なし / 最長 16 文字 / 最大 3 語 / 英数字と空白のみ
+- 元ゲームと同じく、開始時にランダムな位置から順送り
 
-**したがって実装は次の形にする**:
+| # | グループ | 例 |
+| --- | --- | --- |
+| 1 | Cute but Lethal | Wobbles, Mochi, Dumpling |
+| 2 | Undeserved Nobility | Sir Gusty, Baron Drizzle, Lord Sogworth |
+| 3 | Sound Effects | Whoosh, Krakadoom, Blorp |
+| 4 | Passive Aggressive | Just Saying, Per My Last, Circling Back |
+| 5 | Domestic Disasters | Wet Socks, Flipped Brolly, Bin Day |
+| 6 | Wildly Underselling It | Definitely Fine, Mild Concern, Barely Windy |
+| 7 | Formidable Relatives | Auntie Mildred, Great Aunt Enid, Nana Gertrude |
+| 8 | Snacks with Intent | Bubble Tea, Stinky Tofu, Pineapple Cake |
+| 9 | Escaped from a Meeting | Synergy, Q3 Target, Low Hanging |
+| 10 | Taking Itself Seriously | Doomcloud, Skyfist, Maelstromp |
+| 11 | Deeply Apologetic | So Sorry, Whoopsie, Terribly Sorry |
+| 12 | Animals Behaving Badly | Angry Goose, Smug Otter, Unionised Bees |
+| 13 | Unarguable | Actually, Notwithstanding, Ostensibly |
+| 14 | Final Boss | The Big One, Goodbye Roof, The Last Straw |
 
-- `tools/bake-names.mjs` は**出典URLから取得して `src/rules/names.js` を生成する**道具として書く。
-  生成物には出典URL・取得日・件数を先頭コメントに埋め込む。
-- 取得できない環境では**カタカナのまま**の `names.js` を生成し、
-  ゲーム内メニューに「Typhoon names are shown in Japanese katakana because the official
-  romanized list could not be retrieved at build time.」と明記する。
-- 解決策は 2 つ。**(a)** ネットワークの通るセッションで `bake-names.mjs` を走らせる。
-  **(b)** 元HTMLと同じくユーザーにリストを貼っていただく（この場合も出典を併記する）。
+**笑いの構造**: 名前そのものより、**大真面目なニュース速報に差し込まれること**で効く。
 
-`names.js` は**生成物としてコミット**し、手で編集しない（`src/data/geo.js` と同じ扱い）。
+```
+FORMED       Typhoon No. 12 (Wobbles) has formed. Stay alert for its forecast track.
+DISSIPATED   Typhoon No. 12 (Wobbles) has weakened into an extratropical cyclone.
+             Typhoon No. 67 (Aunt Hortensia) made landfall in Eastern Taiwan
+```
+
+だから**ニュース文・HUD・シェア文の書式は元のまま真面目に保つ**。名前だけがふざける。
+
+**必須の明示** — 実在リストと誤認されないよう、メニューに次の一文を出す:
+
+> Typhoon names in this game are entirely fictional and were made up for it.
+> They are not the official names assigned by the ESCAP/WMO Typhoon Committee.
+
+これに伴い、**元ゲームのメニューにあった気象庁リストへの帰属表示は削除する**（§3.1）。
+`names.js` は生成物ではなく**手書きのコンテンツ**なので、`tools/bake-names.mjs` は不要。
 
 ---
 
@@ -734,7 +757,7 @@ games/typhoon-escape/
   vite.config.js        # base: "./"（既存と同じくどこに置いても動く）
   index.html
   DESIGN.md             # この文書
-  CREDITS.md            # Natural Earth / world-atlas / 気象庁アジア名の出典とライセンス
+  CREDITS.md            # Natural Earth / world-atlas の出典とライセンス（台風名は創作なので不要）
   src/
     main.js             # 起動・状態遷移（title → play → over）とループ
     world/
@@ -746,7 +769,7 @@ games/typhoon-escape/
       config.js         # §1b.3 の換算表そのもの。**唯一の数値の置き場所**
       game.js           # スポーン・当たり判定・スコア（生存日数）・上陸地域
       region.js         # §1b.5 の地域カスケード
-      names.js          # 台風名リスト（生成物）
+      names.js          # 台風名リスト（**創作・手書き**。生成物ではない）
     render/
       globe.js          # 海・陸・海岸線・大気
       stormview.js      # 渦・予報円・過去進路（§4.3 の表）
@@ -759,7 +782,6 @@ games/typhoon-escape/
   tools/
     calibrate.mjs       # §1b の換算表を world-atlas 実データから再生成（設計値の出所）
     bake-geo.mjs        # world-atlas → src/data/geo.js
-    bake-names.mjs      # 台風名リスト → src/rules/names.js
     standalone.mjs      # dist を1枚のHTMLへ
   test/
     harness.mjs         # 既存リポジトリと同じ依存ゼロの極小ハーネス
@@ -802,8 +824,7 @@ games/typhoon-escape/
 
 ## 10. 実装順序
 
-ルール仕様も設計判断も確定したので、**全工程が着手可能**。
-唯一の未解決（台風名のローマ字表記）は `names.js` という差し替え可能な生成物に隔離されている。
+ルール仕様も設計判断も確定し、**未解決の依存はゼロ**。全工程が着手可能。
 
 1. プロジェクト雛形 + `bake-geo.mjs` + `geo.test.mjs`
    → 地図データが正しく焼けていることを先に固める
@@ -834,13 +855,13 @@ games/typhoon-escape/
 | 4 | 陸の範囲 | **南極大陸を含む全ての陸**。元の `maxLat < -55` 除外は撤廃。極の穴は扇形分割で塞ぐ。§3.3b |
 | 5 | プレイヤー本体 | **台湾本島のみ**。離島は陸レイヤ側に通常の陸として残る。§3.2 |
 | 6 | 地図解像度 | **`land-10m`**。3 の実寸選択でカメラが寄るため 50m では最寄りで 1 辺 5.83 px になる。§3.3 |
+| 7 | 台風名 | **140 個すべて創作**（`src/rules/names.js`）。実在リストの取得が全滅したので、出典が要らない架空の名前に置き換えた。実在リストではない旨をメニューに明記する。§7 |
 
 ### 11.2 未解決
 
 | # | 項目 | 状態 |
 | --- | --- | --- |
-| 1 | **台風名 140 個のローマ字表記** | **[不明]** 方針は「ローマ字化する」で確定したが、本セッションでは出典 4 件すべてが `EGRESS_BLOCKED`。§7 に取得先・失敗記録・代替手段を記載。**実装の他の部分は止まらない**（`names.js` は生成物として差し替え可能） |
-| 2 | 音 | **[要確認]** 元ゲームには音がない **[確認済]**。既存リポジトリは WebAudio 合成 + 録音声。付けるなら合成のみでよいか |
-| 3 | シェアURL | **[要確認]** 元は `lovewcycle.com` を指す。本作の公開先URLに差し替える必要がある |
+| 1 | 音 | **[要確認]** 元ゲームには音がない **[確認済]**。既存リポジトリは WebAudio 合成 + 録音声。付けるなら合成のみでよいか |
+| 2 | シェアURL | **[要確認]** 元は `lovewcycle.com` を指す。本作の公開先URLに差し替える必要がある |
 
-2 と 3 は実装の最終段（§10-9）で決めれば足りるので、**着手を止めない**。
+どちらも実装の最終段（§10-9）で決めれば足りるので、**着手を止めるものは何もない**。

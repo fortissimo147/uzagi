@@ -134,6 +134,19 @@ npm run deploy
 （CI などブラウザの無い所で回すときは、Cloudflare で API トークンを作って
 `CLOUDFLARE_API_TOKEN` に入れる）。
 
+**もう1つのゲームも同じサイトに載せる**
+
+`games/typhoon-escape`（Typhoon Escape — Globe Edition）を
+`uzagi.pages.dev/typhoon-escape/` に同居させる。
+
+```sh
+npm run build:all    # 両方ビルドして dist/typhoon-escape/ に入れる
+npm run deploy:all   # そのうえで Cloudflare へ送る
+```
+
+`public/_headers` に `/typhoon-escape/assets/*` のキャッシュ指定も入れてある
+（Cloudflare Pages は**最上位の `_headers` しか読まない**ので、子側のものは効かない）。
+
 **GitHub につないで push で自動デプロイ**
 
 Cloudflare のダッシュボード → Workers & Pages → Create → Pages →
@@ -141,9 +154,11 @@ Connect to Git でこのリポジトリを選び、次を設定する。
 
 | 項目 | 値 |
 | --- | --- |
+| Production branch | 既定ブランチ（**台風ゲームも載せるなら、それが入っているブランチ**） |
 | Framework preset | None |
-| Build command | `npm run build` |
+| Build command | `npm run build`（台風ゲームも載せるなら `npm run build:all`） |
 | Build output directory | `dist` |
+| Root directory (advanced) | 空のまま |
 
 `.nvmrc` があるので Node の版はそれに合う。以後は push するたびに
 Cloudflare 側でビルドされて公開される。

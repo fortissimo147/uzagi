@@ -11,7 +11,9 @@
     "standalone": "vite build && node tools/standalone.mjs",
     "voicebank": "node tools/make-voicebank.mjs",
     "model": "node tools/preview/sheet.mjs",
-    "deploy": "npm run build && npx --yes wrangler@4 pages deploy dist --project-name uzagi"
+    "deploy": "npm run build && npx --yes wrangler@4 pages deploy dist --project-name uzagi",
+    "build:all": "vite build && npm --prefix games/typhoon-escape ci && npm --prefix games/typhoon-escape run build && mkdir -p dist/typhoon-escape && cp -r games/typhoon-escape/dist/. dist/typhoon-escape/ && rm -f dist/typhoon-escape/_headers",
+    "deploy:all": "npm run build:all && npx --yes wrangler@4 pages deploy dist --project-name uzagi"
   },
   "dependencies": {
     "three": "^0.180.0"

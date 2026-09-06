@@ -8,3 +8,12 @@
   Cache-Control: public, max-age=0, must-revalidate
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
+
+# サブディレクトリに置いた typhoon-escape 用（Cloudflare Pages は最上位の
+# _headers しか読まないので、子の dist/typhoon-escape/_headers は効かない）
+/typhoon-escape/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/typhoon-escape/
+  Cache-Control: public, max-age=0, must-revalidate
+/typhoon-escape/index.html
+  Cache-Control: public, max-age=0, must-revalidate

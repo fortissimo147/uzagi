@@ -42,6 +42,20 @@ function geometry(topo, collection, id) {
   if (!g) throw new Error(`geometry ${id} not found in ${collection}`);
   return g.type === "Polygon" ? [g.arcs] : g.arcs;
 }
+/**
+ * リング末尾の閉じ点を落とす。
+ * 閉じ点は先頭と同一座標の重複なので、残すと球面重心がその頂点に引っ張られ、
+ * 外接半径が実際より小さく出る（日本 110m で 9.6226° → 9.5015°、1.3% のずれ）。
+ * bake-geo.mjs が焼く頂点列も閉じ点なしなので、そちらに合わせる。
+ */
+function open(ring) {
+  if (ring.length > 1) {
+    const a = ring[0];
+    const z = ring[ring.length - 1];
+    if (a[0] === z[0] && a[1] === z[1]) return ring.slice(0, -1);
+  }
+  return ring;
+}
 
 // ---- 球面ヘルパ ----
 const R_KM = 6371.0088; // IUGG 平均半径
@@ -129,13 +143,13 @@ const r110 = decoder(c110), r10 = decoder(c10), rl50 = decoder(l50);
 
 // 元ゲームのプレイヤー本体 = countries-110m の日本（全リング）
 const JP = [];
-for (const poly of geometry(c110, "countries", "392")) for (const r of poly) JP.push(...r110(r));
+for (const poly of geometry(c110, "countries", "392")) for (const r of poly) JP.push(...open(r110(r)));
 const rhoJ = circumradiusDeg(JP);
 
 // 本作のプレイヤー本体 = countries-10m の台湾のうち最大リング（本島のみ）
 let TW = [];
 for (const poly of geometry(c10, "countries", "158")) {
-  const o = r10(poly[0]);
+  const o = open(r10(poly[0]));
   if (o.length > TW.length) TW = o;
 }
 const cTW = centroid(TW);
@@ -158,7 +172,7 @@ console.log(`台湾本島の描画倍率 K_TW = ${f(K_TW, 1)}（元ゲームの�
 console.log(`元マップの弧長スケール @lat${ORIG.PHI_J} = ${f(mJ)} px/°`);
 console.log(`元での自国の描画外接半径   = ${f(bodyPx, 2)} px`);
 console.log(`球面での自国の描画外接半径 = ${f(bodyDeg)}° = ${f(km(bodyDeg), 1)} km`);
-console.log(`A = ${f(A, 6)} 度(弧長) / 元px`);
+console.log(`A = ${f(A, 6)} 度(弧長) / 元px   (RHO_JP=${rhoJ.toPrecision(10)}, RHO_TW=${rhoT.toPrecision(10)})`);
 
 // ================= 換算表 =================
 console.log("\n== 換算表（DESIGN.md §1b.3）==");

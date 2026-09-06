@@ -15,24 +15,26 @@
   </head>
   <body>
     <div id="app">
-      <div class="hud"><div id="time">August 1, 2026</div></div>
+      <div class="hud">
+        <div id="time"></div>
+        <div id="survived" hidden></div>
+      </div>
       <div id="popup">
         <h1 id="ptitle"></h1>
         <p id="ptext"></p>
+        <p id="pdays" hidden></p>
+        <div id="langs"></div>
         <button id="pbtn"></button>
-        <button id="sharebtn" hidden>Share on 𝕏</button>
+        <button id="sharebtn" hidden></button>
       </div>
       <div id="pad"><div id="knob"></div></div>
       <div id="ticker"></div>
       <button id="menubtn" aria-label="Menu">&#9776;</button>
       <div id="menu">
         <button id="menuclose" aria-label="Close">&times;</button>
-        <h3>Data sources and licenses</h3>
+        <h3 id="menutitle"></h3>
         <p id="disclaimer"></p>
-        <p>
-          Map data: Natural Earth (public domain), converted to TopoJSON by
-          world-atlas.
-        </p>
+        <p id="mapcredit"></p>
         <pre>world-atlas
 Copyright 2013-2019 Michael Bostock
 

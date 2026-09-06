@@ -56,6 +56,24 @@ for (const [label, w, h] of sizes) {
   const pbtn = await box("#pbtn");
   check("開始ボタンが 44px 以上（指で押せる大きさ）", pbtn.height >= 40 && pbtn.width >= 88, JSON.stringify(pbtn));
 
+  // 言語の選択（§7.2）。開始画面に増えた行なので、小さい縦画面でも収まることを見る。
+  {
+    const lb = await box("#langs");
+    check("言語の選択が画面内に収まる", inView(lb), JSON.stringify(lb));
+    const btns = await page.locator("#langs button").all();
+    check("言語ボタンが 3 つ見えている", btns.length === 3, String(btns.length));
+    let minH = Infinity;
+    for (const b of btns) {
+      const r = await b.boundingBox();
+      check("言語ボタンが画面内に収まる", inView(r), JSON.stringify(r));
+      minH = Math.min(minH, r.height);
+    }
+    check(`言語ボタンが指で押せる高さ（最小 ${minH.toFixed(0)}px）`, minH >= 36, String(minH));
+    check("言語の選択と開始ボタンが重ならない",
+      lb.y + lb.height <= (await box("#pbtn")).y + 1,
+      `${(lb.y + lb.height).toFixed(1)} vs ${(await box("#pbtn")).y.toFixed(1)}`);
+  }
+
   await page.locator("#pbtn").click();
   await page.waitForTimeout(300);
   check("スティックが画面内に収まる", inView(await box("#pad")), JSON.stringify(await box("#pad")));

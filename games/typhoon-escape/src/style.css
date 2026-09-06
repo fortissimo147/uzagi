@@ -93,6 +93,55 @@ canvas {
   display: none;
 }
 
+/* 生き延びた日数（§1b.10）。ゲームオーバーでは一番読ませたい数字なので大きく出す。 */
+#pdays {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ffe000;
+}
+#pdays[hidden] {
+  display: none;
+}
+#survived {
+  margin-top: 2px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+#survived[hidden] {
+  display: none;
+}
+
+/* 言語の選択（§7.2）。自称を並べるだけなので、どの言語で見ても同じ見た目。 */
+#langs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 86vw;
+}
+#langs[hidden] {
+  display: none;
+}
+#popup button.lang {
+  font-size: 13px;
+  /* 小さい縦画面でも指で押せるだけの高さを確保する（§9 mobile）。
+     ただし開始ボタン（44px）ほどは要らない。ポップアップ全体が 320x568 に収まる方が大事。 */
+  min-height: 38px;
+  padding: 8px 16px;
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+}
+#popup button.lang.on {
+  background: #fff;
+  color: #0e1a36;
+  border-color: #fff;
+  font-weight: 700;
+}
+
 #pad[hidden] {
   display: none;
 }

@@ -12,6 +12,8 @@
 // 名前は 1〜3 語・最大 17 文字に収めてある（HUD とティッカーの折り返し対策）。
 
 /** @type {{group: string, names: string[]}[]} */
+import { STRINGS } from "./i18n.js";
+
 export const NAME_GROUPS = [
   {
     group: "Cute but Lethal",
@@ -88,7 +90,9 @@ export const NAME_GROUPS = [
 /** 発生順に使う 140 個のフラットな配列。 */
 export const NAMES = NAME_GROUPS.flatMap((g) => g.names);
 
-/** 実在リストではないことを示す、メニューに出す一文。 */
-export const NAMES_DISCLAIMER =
-  "Typhoon names in this game are entirely fictional and were made up for it. " +
-  "They are not the official names assigned by the ESCAP/WMO Typhoon Committee.";
+/**
+ * 実在リストではないことを示す、メニューに出す一文。
+ * 表示は言語ごとに rules/i18n.js が持つ（§7）。ここは英語版への別名にとどめ、
+ * 同じ文が二か所に書かれる状態を作らない。
+ */
+export const NAMES_DISCLAIMER = STRINGS.en.disclaimer;

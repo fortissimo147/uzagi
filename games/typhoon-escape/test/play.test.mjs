@@ -142,15 +142,27 @@ check("上キーで北へ動く（緯度が増える）", await page.evaluate((a
 
 section("被弾からゲームオーバーまで");
 check("この時点ではまだ生きている", await page.evaluate(() => window.__game.game.over === false));
-// 台風を無理やり本島の上に置いて当てる
-await page.evaluate(() => {
+// 台風を無理やり本島に当てる。
+//
+// **中心（g.pos）に置いてはいけない。** 致命半径を元の半分にした時点（§1b.7）から、
+// r=2.0 の致死半径 0.5500 度に対し中心から最寄りの海岸線頂点は 0.5611 度で、
+// **余裕が −0.0111 度**になっていた。当たるかどうかは台風がどちらへ流れるか次第で、
+// この検査は以後ずっと五分五分の賭けになっていた（実測: 同じコードで成功と失敗の両方）。
+// 海岸線の頂点そのものに置けば距離 0 で、1 フレームの流れ（0.0835 度）でも余裕がある。
+const fixture = await page.evaluate(() => {
   const g = window.__game.game;
   window.__game.cfg.MAX_STORMS = 7;
   g.spawn();
   const st = g.storms[g.storms.length - 1];
-  st.p = [...g.pos];
+  st.p = [...g.worldPts[0]];
   st.r = 2.0;
+  const dot = st.p[0] * g.worldPts[0][0] + st.p[1] * g.worldPts[0][1] + st.p[2] * g.worldPts[0][2];
+  const dist = (Math.acos(Math.min(1, dot)) * 180) / Math.PI;
+  return { dist, lethal: st.r * window.__game.cfg.LETHAL, step: window.__game.cfg.STORM_SPD0 * window.__game.cfg.DT_MAX };
 });
+check(`当てる仕掛けに余裕がある（距離 ${fixture.dist.toFixed(4)}° / 致死 ${fixture.lethal.toFixed(4)}° / 1フレーム ${fixture.step.toFixed(4)}°）`,
+  fixture.dist + fixture.step * 2 < fixture.lethal,
+  "余裕が無いと、当たるかどうかが台風の流れる向き次第になる");
 await page.waitForTimeout(200);
 {
   // ラウンドトリップ 1 回で全部読む。swiftshader だと 1 回の evaluate に
@@ -162,7 +174,8 @@ await page.waitForTimeout(200);
     popupAtOver: window.__game.popupAtOver,
   }));
   check("接触で over になる", d.over === true);
-  check("上陸地域が 4 種のいずれか", ["Northern Taiwan", "Central Taiwan", "Southern Taiwan", "Eastern Taiwan"].includes(d.region), d.region);
+  check("上陸地域が 4 種のいずれか（保持するのはキー。表示名は §7 の束が持つ）",
+    ["N", "C", "S", "E"].includes(d.region), d.region);
   check("死んだ瞬間はポップアップが出ていない（1500 ms のスローモーション）", d.popupAtOver === "hidden", d.popupAtOver);
 }
 await page.waitForTimeout(2000);
@@ -324,6 +337,158 @@ const disc = await page.locator("#disclaimer").textContent();
 check("台風名が架空である旨が英語で書かれている", /fictional/i.test(disc) && /not the official/i.test(disc));
 check("Natural Earth の出典が書かれている", (await page.locator("#menu").textContent()).includes("Natural Earth"));
 await page.locator("#menuclose").click();
+
+section("生存日数の表示（DESIGN.md §1b.10）");
+// 言語の保存を消してから読み直し、既定（英語）で始める。
+await page.evaluate((k) => localStorage.removeItem(k), "typhoon-escape.lang");
+await page.reload({ waitUntil: "load" });
+await page.waitForFunction(() => window.__game && window.__game.globe, null, { timeout: 90000 });
+check("タイトルでは生存日数を出さない", await page.locator("#survived").isHidden());
+await page.locator("#pbtn").click();
+await page.waitForTimeout(1500);
+{
+  const d = await page.evaluate(() => ({
+    txt: document.getElementById("survived").textContent,
+    hidden: document.getElementById("survived").hidden,
+    days: window.__game.game.days,
+    elapsed: window.__game.game.elapsed,
+  }));
+  check("プレイ中は生存日数が出る", !d.hidden);
+  check(`HUD の生存日数が game.days と一致（"${d.txt}" / days=${d.days}）`,
+    d.txt === `Survived ${d.days} day${d.days === 1 ? "" : "s"}`);
+  check("生存日数 = floor(elapsed)", d.days === Math.floor(d.elapsed), `${d.days} / ${d.elapsed.toFixed(3)}`);
+}
+// 当ててゲームオーバーにし、ポップアップの日数を見る
+await page.evaluate(() => {
+  const g = window.__game.game;
+  g.spawn();
+  const st = g.storms[g.storms.length - 1];
+  st.p = [...g.pos];
+  st.r = 2.0;
+});
+await page.waitForTimeout(2200);
+{
+  const d = await page.evaluate(() => ({
+    cls: document.getElementById("popup").className,
+    pdays: document.getElementById("pdays").textContent,
+    pdaysHidden: document.getElementById("pdays").hidden,
+    survivedHidden: document.getElementById("survived").hidden,
+    days: window.__game.game.days,
+    share: window.__game.shareText(),
+  }));
+  check("ゲームオーバー画面が出ている", d.cls === "over", d.cls);
+  check("ゲームオーバーに生存日数が出る", !d.pdaysHidden && d.pdays.length > 0, d.pdays);
+  check(`ゲームオーバーの日数が game.days と一致（"${d.pdays}"）`,
+    d.pdays === `You survived ${d.days} day${d.days === 1 ? "" : "s"}.`);
+  check("ゲームオーバー中は HUD の生存日数を隠す（ポップアップと二重に出さない）", d.survivedHidden);
+  check(`シェア文の日数も一致（${d.days} 日）`, d.share.includes(`I survived ${d.days} day`), d.share.split("\n")[1]);
+}
+
+section("言語の切り替え（DESIGN.md §7.2）");
+{
+  const n = await page.locator("#langs button").count();
+  check("言語ボタンが 3 つ", n === 3, String(n));
+  const labels = await page.locator("#langs button").allTextContents();
+  check("English / 日本語 / 繁體中文", labels.join(",") === "English,日本語,繁體中文", labels.join(","));
+  check("既定は English が選択状態",
+    await page.locator('#langs button[data-lang="en"]').evaluate((e) => e.classList.contains("on")));
+}
+// ゲームオーバー画面のまま日本語へ切り替える（開始画面でもある）
+await page.locator('#langs button[data-lang="ja"]').click();
+await page.waitForTimeout(200);
+{
+  const d = await page.evaluate(() => ({
+    ptitle: document.getElementById("ptitle").textContent,
+    ptext: document.getElementById("ptext").textContent,
+    pdays: document.getElementById("pdays").textContent,
+    pbtn: document.getElementById("pbtn").textContent,
+    share: document.getElementById("sharebtn").textContent,
+    time: document.getElementById("time").textContent,
+    htmlLang: document.documentElement.lang,
+    on: document.querySelector('#langs button[data-lang="ja"]').classList.contains("on"),
+    enOff: !document.querySelector('#langs button[data-lang="en"]').classList.contains("on"),
+    stored: localStorage.getItem("typhoon-escape.lang"),
+    days: window.__game.game.days,
+    shareText: window.__game.shareText(),
+  }));
+  check("日本語ボタンが選択状態になる", d.on && d.enOff);
+  check("html lang が ja になる", d.htmlLang === "ja", d.htmlLang);
+  check("localStorage に保存される", d.stored === "ja", String(d.stored));
+  check("ゲームオーバーの日付が日本語表記になる", /^2026年\d+月\d+日$/.test(d.ptitle), d.ptitle);
+  check("上陸文が日本語になる", d.ptext.includes("上陸") && d.ptext.includes("台風"), d.ptext);
+  check("生存日数が日本語になる", d.pdays === `${d.days} 日間生き延びた。`, d.pdays);
+  check("ボタンが日本語になる", d.pbtn === "新しい夏を始める" && d.share === "𝕏 で共有", `${d.pbtn} / ${d.share}`);
+  check("HUD の日付も日本語表記になる", /^2026年\d+月\d+日$/.test(d.time), d.time);
+  check("シェア文も日本語になる", d.shareText.includes("日間生き延びた"), d.shareText.split("\n")[1]);
+}
+// メニューの文言も切り替わる
+await page.locator("#menubtn").click();
+{
+  const d = await page.evaluate(() => ({
+    t: document.getElementById("menutitle").textContent,
+    c: document.getElementById("mapcredit").textContent,
+    d: document.getElementById("disclaimer").textContent,
+  }));
+  check("メニュー見出しが日本語", d.t === "出典とライセンス", d.t);
+  check("地図の出典が日本語（Natural Earth は固有名詞なので残る）",
+    d.c.includes("Natural Earth") && d.c.includes("地図データ"), d.c);
+  check("台風名の但し書きが日本語", d.d.includes("架空") && d.d.includes("台風委員会"), d.d.slice(0, 30));
+}
+await page.locator("#menuclose").click();
+// 繁體中文へ
+await page.locator('#langs button[data-lang="zh-Hant"]').click();
+await page.waitForTimeout(200);
+{
+  const d = await page.evaluate(() => ({
+    ptitle: document.getElementById("ptitle").textContent,
+    ptext: document.getElementById("ptext").textContent,
+    pdays: document.getElementById("pdays").textContent,
+    pbtn: document.getElementById("pbtn").textContent,
+    htmlLang: document.documentElement.lang,
+    stored: localStorage.getItem("typhoon-escape.lang"),
+    days: window.__game.game.days,
+  }));
+  check("html lang が zh-Hant になる", d.htmlLang === "zh-Hant", d.htmlLang);
+  check("localStorage が zh-Hant", d.stored === "zh-Hant", String(d.stored));
+  check("日付が中文表記", /^2026年\d+月\d+日$/.test(d.ptitle), d.ptitle);
+  check("上陸文が繁體中文になる", d.ptext.includes("颱風") && d.ptext.includes("登陸"), d.ptext);
+  check("生存日数が繁體中文になる", d.pdays === `你生存了 ${d.days} 天。`, d.pdays);
+  check("ボタンが繁體中文になる", d.pbtn === "開始新的夏天", d.pbtn);
+}
+// 選んだ言語は読み直しても残る
+await page.reload({ waitUntil: "load" });
+await page.waitForFunction(() => window.__game && window.__game.globe, null, { timeout: 90000 });
+{
+  const d = await page.evaluate(() => ({
+    ptext: document.getElementById("ptext").textContent,
+    pbtn: document.getElementById("pbtn").textContent,
+    ptitle: document.getElementById("ptitle").textContent,
+    time: document.getElementById("time").textContent,
+    on: document.querySelector('#langs button[data-lang="zh-Hant"]').classList.contains("on"),
+  }));
+  check("読み直しても繁體中文のまま", d.on && d.pbtn === "開始這個夏天", d.pbtn);
+  check("タイトルの説明も繁體中文", d.ptext.includes("臺灣") && d.ptext.includes("颱風"), d.ptext);
+  check("作品名は訳さない", d.ptitle === "TYPHOON ESCAPE", d.ptitle);
+  check("タイトル画面の日付も中文表記", d.time === "2026年8月1日", d.time);
+}
+// ニュース速報のタグも言語に従う
+await page.locator("#pbtn").click();
+await page.waitForTimeout(600);
+{
+  // 速報の行は時間で消える。タグと本文を別々に読むと、間に消えて片方だけ取れる
+  // （実測で起きた）。1 回の evaluate で同じ行から両方まとめて取る。
+  const row = await page.evaluate(() => {
+    const r = document.querySelector("#ticker .row");
+    if (!r) return null;
+    return { tag: r.querySelector(".tag").textContent, txt: r.querySelector(".ttext").textContent };
+  });
+  check("速報の行がある", !!row, String(row));
+  check("ニュースのタグが繁體中文", row && row.tag === "生成", row && row.tag);
+  check("ニュース本文が繁體中文",
+    !!row && row.txt.includes("號颱風") && row.txt.includes("已生成"), row && row.txt);
+}
+// 後片付け。次に走るときに英語で始まるよう保存値を消す。
+await page.evaluate((k) => localStorage.removeItem(k), "typhoon-escape.lang");
 
 check("JS エラーがひとつも出ていない", errors.length === 0, errors.slice(0, 3).join(" / "));
 

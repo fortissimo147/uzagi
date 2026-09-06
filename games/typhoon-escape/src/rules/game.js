@@ -71,6 +71,7 @@ function interiorSamples(body, ring, n = 9) {
 }
 import { NAMES } from "./names.js";
 import { region } from "./region.js";
+import { bundle, DEFAULT_LANG } from "./i18n.js";
 
 /** 生存日数 → 日付。元の gameDate()。実時間 1 秒 = ゲーム内 1 日。 */
 export function gameDate(elapsed) {
@@ -80,8 +81,8 @@ export function gameDate(elapsed) {
   return date;
 }
 
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-export const formatDate = (d) => `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+/** 日付の書き方は言語ごとに違う（§7）。月は 0 始まりのまま束へ渡す。 */
+export const formatDate = (d, L = bundle(DEFAULT_LANG)) => L.date(d.getFullYear(), d.getMonth(), d.getDate());
 
 export class Game {
   /**
@@ -91,8 +92,9 @@ export class Game {
    * @param {() => number} o.rand
    * @param {(msg: string, kind: string) => void} o.onNews
    */
-  constructor({ playerRing, landBodies, rand = Math.random, onNews = () => {} }) {
+  constructor({ playerRing, landBodies, rand = Math.random, onNews = () => {}, lang = DEFAULT_LANG }) {
     this.rand = rand;
+    this.L = bundle(lang);
     this.onNews = onNews;
     this.landBodies = landBodies;
     this.playerRing = playerRing;
@@ -280,7 +282,7 @@ export class Game {
     const st = createStorm({ pos: p, bearing, pattern, cfg: CFG, rand: this.rand, no: this.tyNo, name });
     setForecast(st, this.tsp, CFG);
     this.storms.push(st);
-    this.onNews(`Typhoon No. ${st.no} (${st.name}) has formed. Stay alert for its forecast track.`, "formed");
+    this.onNews(this.L.newsFormed(st.no, st.name), "formed");
   }
 
   /** 1 フレーム。visibleDeg は発生・消滅の基準となるプレイ画角。 */
@@ -317,12 +319,12 @@ export class Game {
       const res = stepStorm(st, dt, this.pos, this.tsp, CFG, this.rand);
       if (res === "weakened") {
         this.storms.splice(i, 1);
-        this.onNews(`Typhoon No. ${st.no} (${st.name}) has weakened into an extratropical cyclone.`, "gone");
+        this.onNews(this.L.newsWeakened(st.no, st.name), "gone");
         continue;
       }
       if (outOfPlay(st, this.pos, visibleDeg, CFG)) {
         this.storms.splice(i, 1);
-        this.onNews(`Typhoon No. ${st.no} (${st.name}) has moved away from Taiwan and dissipated.`, "gone");
+        this.onNews(this.L.newsAway(st.no, st.name), "gone");
       }
     }
 
@@ -362,14 +364,30 @@ export class Game {
     }
   }
 
+  /** 表示言語を差し替える。タイトル／ゲームオーバー画面から呼ばれる（§7.2）。 */
+  setLang(lang) {
+    this.L = bundle(lang);
+    return this;
+  }
+
+  /**
+   * 生き延びた日数（§1b.10）。実時間 1 秒 = ゲーム内 1 日なので elapsed の整数部そのもの。
+   * 表示日付も `START_DATE + days` なので、日付と日数は必ず一致する。
+   */
   get days() {
     return Math.floor(this.elapsed);
   }
   get dateText() {
-    return formatDate(gameDate(this.elapsed));
+    return formatDate(gameDate(this.elapsed), this.L);
+  }
+  get survivedText() {
+    return this.L.survivedHud(this.days);
+  }
+  get survivedOverText() {
+    return this.L.survivedOver(this.days);
   }
   landfallText() {
-    return this.hit ? `Typhoon No. ${this.hit.no} (${this.hit.name}) made landfall in ${this.hit.region}` : "";
+    return this.hit ? this.L.landfall(this.hit.no, this.hit.name, this.L.regions[this.hit.region]) : "";
   }
 }
 
@@ -378,9 +396,10 @@ export class Game {
  * URL は呼び出し側が渡す（実際に開かれている URL から取る）。
  */
 export function shareText(game, url) {
+  const L = game.L;
   return (
-    `[Game] Move Taiwan and outrun the typhoons!\n` +
-    `On ${game.dateText}, ${game.landfallText()}. I survived ${game.days} days.\n\n` +
+    `${L.shareHead}\n` +
+    `${L.shareBody(game.dateText, game.landfallText(), game.days)}\n\n` +
     `#TyphoonEscape\n${url}`
   );
 }

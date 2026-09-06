@@ -11,7 +11,7 @@ import { Input } from "./render/input.js";
 import { Hud } from "./render/hud.js";
 import { Game, shareText } from "./rules/game.js";
 import { CFG, COLORS } from "./rules/config.js";
-import { NAMES_DISCLAIMER } from "./rules/names.js";
+import { LANGS, LANG_KEY, bundle, pickLang } from "./rules/i18n.js";
 
 /**
  * シェア文に載せる URL。
@@ -30,6 +30,22 @@ function shareUrl() {
   }
 }
 
+/** 言語の保存。プライベートブラウズなどで localStorage が無い環境でも落ちない。 */
+function readLang() {
+  try {
+    return localStorage.getItem(LANG_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+function writeLang(code) {
+  try {
+    localStorage.setItem(LANG_KEY, code);
+  } catch {
+    /* 保存できないだけ。次回は既定に戻る */
+  }
+}
+
 class App {
   constructor() {
     this.app = document.getElementById("app");
@@ -45,7 +61,12 @@ class App {
     this.cfg = CFG; // テストから難度をいじれるようにしておく
     this.shareUrl = shareUrl;
     this.shareText = () => shareText(this.game, shareUrl());
-    this.hud = new Hud(document, { disclaimer: NAMES_DISCLAIMER });
+    // 言語（§7.2）。保存値 → ブラウザの言語 → 英語 の順に決める。
+    this.lang = pickLang(readLang(), navigator.languages || [navigator.language || ""]);
+    this.L = bundle(this.lang);
+    document.documentElement.lang = this.L.htmlLang;
+    this.hud = new Hud(document, { strings: this.L, langs: LANGS, lang: this.lang });
+    this.hud.onLang = (code) => this.setLang(code);
     this.input = new Input(this.app, document.getElementById("pad"), document.getElementById("knob"));
 
     const polygons = loadLandBodies();
@@ -59,6 +80,7 @@ class App {
       playerRing,
       landBodies: bodies,
       onNews: (msg, kind) => this.hud.news(msg, kind),
+      lang: this.lang,
     });
 
     window.addEventListener("resize", () => this.resize());
@@ -76,6 +98,25 @@ class App {
     this.introT = 0;
     this.snapCam = false;
     requestAnimationFrame((t) => this.loop(t));
+  }
+
+  /**
+   * 言語を切り替える（§7.2）。
+   * 日付や上陸文はゲームの状態から作るので、ポップアップの塗り直しはここが受け持つ。
+   * すでに流れているニュース行は作られた時の言語のまま流れきる（作り直さない）。
+   */
+  setLang(code) {
+    this.lang = code;
+    this.L = bundle(code);
+    writeLang(code);
+    document.documentElement.lang = this.L.htmlLang;
+    this.game.setLang(code);
+    this.hud.setStrings(this.L, code);
+    if (this.state === "over" && this.hud.popup.className === "over") {
+      this.hud.showOver(this.game.dateText, this.game.landfallText(), this.game.survivedOverText);
+    } else if (this.state === "title") {
+      this.hud.showTitle();
+    }
   }
 
   resize() {
@@ -140,7 +181,7 @@ class App {
         this.input.enabled = false;
         this.input.release();
         setTimeout(() => {
-          this.hud.showOver(g.dateText, g.landfallText());
+          this.hud.showOver(g.dateText, g.landfallText(), g.survivedOverText);
         }, CFG.SLOWMO_MS);
       }
     }
@@ -164,6 +205,7 @@ class App {
     this.globe.land.update();
     this.stormView.update(g.storms, CFG);
     this.hud.setDate(g.dateText);
+    this.hud.setSurvived(g.survivedText);
     // CPU 側の1フレーム時間。GPU の速さに左右されないので、遅い環境でも意味を持つ。
     this.cpuMs = this.cpuMs * 0.9 + (performance.now() - t0) * 0.1;
     this.renderer.render(this.scene, this.camera);

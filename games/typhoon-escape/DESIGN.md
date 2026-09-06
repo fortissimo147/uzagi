@@ -451,6 +451,25 @@ CFG.LETHAL   = 0.275
 
 ---
 
+### 1b.10 生き延びた日数を表示する **[ユーザー指定]**
+
+元ゲームにも「何日生き延びたか」はあったが、**シェア文の中にしか出ていなかった**。
+プレイ中とゲームオーバー画面にも出す。
+
+日数の定義は元のまま `days = floor(elapsed)`。**実時間 1 秒 = ゲーム内 1 日**（§1.2）なので、
+HUD の日付は `START_DATE + days` であり、日付と日数は**同じ量から出ている**。
+別々に数えると必ずずれるので、`Game.days` ひとつを 3 か所（HUD・敗北画面・シェア文）が読む。
+
+- プレイ中: HUD の日付の下に小さく（`Survived 12 days`）
+- 敗北画面: 上陸文の下に大きく黄色で（`You survived 12 days.`）。ここが一番読ませたい数字
+- HUD 側は敗北画面が出ている間は隠す（同じ数字を二重に出さない）
+
+`test/i18n.test.mjs` で `gameDate(d + 0.9)` と `gameDate(d)` が同じ日付になること、
+45 日進むと日付も 45 日進むことを検算する。`test/play.test.mjs` は実ブラウザで
+HUD・敗北画面・シェア文の 3 か所が `game.days` と一致することを見る。
+
+---
+
 ## 2. 座標系と球面数学（**確定** / 検算済）
 
 ### 2.1 単位と変換 **[確認済: Nodeで往復検算]**
@@ -859,34 +878,87 @@ right   = north × p
 
 ---
 
-## 7. 画面上の英語文言 **[確認済: 元文言の対訳]**
+## 7. 画面の文言と言語 **[ユーザー指定: 英語・日本語・繁體中文を選べる]**
 
-元の日本語文言に 1:1 で対応させる。創作しない。
+当初は「ゲームの説明は英語」という指示だったので英語 1 言語だった。
+後から**開始画面で英語 / 日本語 / 繁體中文を選べるようにする**という指示が加わったので、
+文言を 3 言語に増やした。**英語が既定であることは変えていない**（元の指示を残す）。
 
-| 元 | 英語 |
-| --- | --- |
-| `ドラッグで日本列島を動かし\nタイフーンから逃げよう` | `Drag to move Taiwan.\nEscape the typhoons.` |
-| `夏を始める` | `Start the Summer` |
-| `新しい夏を始める` | `Start a New Summer` |
-| `𝕏 でシェア` | `Share on 𝕏` |
-| `2026年8月1日`（HUD/タイトル） | `August 1, 2026` |
-| `タイフーン{N}号（{NAME}）が{REGION}に上陸` | `Typhoon No. {N} ({NAME}) made landfall in {REGION}` |
-| `タイフーン{N}号（{NAME}）が発生しました。今後の進路に警戒してください` | `Typhoon No. {N} ({NAME}) has formed. Stay alert for its forecast track.` |
-| `タイフーン{N}号（{NAME}）は温帯低気圧に変わりました` | `Typhoon No. {N} ({NAME}) has weakened into an extratropical cyclone.` |
-| `タイフーン{N}号（{NAME}）は日本から遠ざかり、消滅しました` | `Typhoon No. {N} ({NAME}) has moved away from Taiwan and dissipated.` |
-| ティッカータグ `発生` | `FORMED` |
-| ティッカータグ `消滅` | `DISSIPATED` |
-| `メニュー` / `閉じる` | `Menu` / `Close` |
-| `使用データ・ライセンス` | `Data sources and licenses` |
-| `地図データが埋め込まれていません` | `Map data is not embedded.` |
-| シェア本文 | `[Game] Move Taiwan and outrun the typhoons!` <br> `On {date}, Typhoon No. {N} ({NAME}) made landfall in {REGION}. I survived {D} days.` <br> `#TyphoonEscape` <br> `{url}` |
+### 7.1 文言の置き場所 — `src/rules/i18n.js` **1 か所だけ**
+
+画面に出る文字列は `rules/i18n.js` の**束（bundle）**だけが持つ。
+`render/` は §0.3 のとおりゲームの中身を知らないので、束を**渡してもらう**側に徹する
+（`new Hud(document, { strings, langs, lang })`）。`index.html` も文言を持たない
+——文言を含む要素は**空で出荷**し、起動時に束から入れる。
+
+これを `test/i18n.test.mjs` が機械的に見張る:
+
+- 3 言語の束の**鍵が完全に一致**し、型も一致する（訳し漏れの検出）
+- 日本語・繁體中文の値が**英語の使い回しでない**（作品名 `TYPHOON ESCAPE` は除外）
+- `src/` の文字列リテラル（コメントは除く）に CJK が混ざっていない
+- `index.html` の文言要素が空で出荷されている
+
+### 7.2 言語の決め方と切り替え
+
+保存値（`localStorage["typhoon-escape.lang"]`）→ ブラウザの言語 → 英語、の順。
+`zh-TW` `zh-HK` `zh-Hant-*` と素の `zh` は繁體中文へ寄せる。簡体字（`zh-CN` `zh-Hans`）は
+選択肢が無いので英語のまま。`localStorage` が使えない環境（プライベートブラウズ等）でも
+落ちないよう読み書きは try で囲む。
+
+切り替えは**タイトル画面とゲームオーバー画面の両方**でできる（どちらも「開始画面」なので）。
+切り替えた瞬間に、日付・上陸文・生存日数・ボタン・メニューをその場で塗り直す。
+すでに流れているニュース速報の行だけは、作られた時の言語のまま流れきる（作り直さない）。
+
+### 7.3 訳語の根拠 **[一部 確認済 / 一部 推定]**
+
+出典サイトは本セッションの egress プロキシで軒並み遮断されており（`jma.go.jp` /
+`cwa.gov.tw` / `hko.gov.hk` / Wikipedia すべて `EGRESS_BLOCKED`）、**本文は読めていない**。
+得られたのは検索結果の**ページ表題**だけで、それを根拠とする。
+
+| 語 | 訳 | 根拠 | 判定 |
+| --- | --- | --- | --- |
+| extratropical cyclone | 温帯低気圧 | 気象庁のページ表題「気象庁｜温帯低気圧と台風」 <br> https://www.jma.go.jp/jma/kishou/know/typhoon/conf/TY-ENQ2006/tropextrop.html | [確認済: 表題のみ] |
+| extratropical cyclone | 溫帶氣旋 | 香港大學の対訳語彙「extratropical cyclone 溫帶氣旋」 <br> https://www.interpreting.hku.hk/glossary/?p=78358 <br> 香港天文台「「溫帶氣旋」與「熱帶氣旋」」 <br> https://www.hko.gov.hk/tc/education/tropical-cyclone/classification-naming-characteristics/00146-extratropical-cyclone-vs-tropical-cyclone.html | [確認済: 表題のみ] |
+| landfall | 上陸 | 気象庁「台風の上陸数」 <br> https://www.data.jma.go.jp/typhoon/statistics/landing/landing.html | [確認済: 表題のみ] |
+| landfall | 登陸 | 中央氣象署 數位科普網「颱風的形容詞知多少?」 <br> https://pweb.cwa.gov.tw/PopularScience/pr/pr_5.html | [確認済: 表題のみ] |
+| Typhoon No. N | 第 N 號颱風 | **未検証** | [推定] |
+| 地域名 | 台湾北部 / 臺灣北部 ほか | **未検証**。そもそも §1b.5 のとおり本作の地域区分は幾何近似であって中華民國の統計地區標準分類ではないので、公式名称との一致は最初から求めていない | [推定] |
+
+**台風名 140 個はどの言語でも英語のまま出す。** 本作の創作なので訳す対象が存在しない
+（実在名なら公式の日本語・中国語表記があるが、これは無い）。ふざけた英語名が
+真面目なニュース文に差し込まれる構造は 3 言語とも同じなので、笑いも壊れない。
+
+繁體中文の「臺灣」は中央氣象署などが使う正式表記に合わせた。
+
+### 7.4 文言表（3 言語）
+
+| 用途 | English（既定） | 日本語 | 繁體中文 |
+| --- | --- | --- | --- |
+| 作品名 | `TYPHOON ESCAPE` | 同左（訳さない） | 同左 |
+| 説明 | `Drag to move Taiwan.\nEscape the typhoons.` | `ドラッグして台湾を動かそう。\n台風から逃げきれ。` | `拖曳以移動臺灣。\n逃離颱風。` |
+| 開始 | `Start the Summer` | `この夏を始める` | `開始這個夏天` |
+| 再開 | `Start a New Summer` | `新しい夏を始める` | `開始新的夏天` |
+| 共有 | `Share on 𝕏` | `𝕏 で共有` | `分享到 𝕏` |
+| 日付 | `August 1, 2026` | `2026年8月1日` | `2026年8月1日` |
+| HUD 生存 | `Survived {D} days` | `{D} 日生存` | `已生存 {D} 天` |
+| 敗北時 生存 | `You survived {D} days.` | `{D} 日間生き延びた。` | `你生存了 {D} 天。` |
+| 上陸 | `Typhoon No. {N} ({NAME}) made landfall in {REGION}` | `台風{N}号（{NAME}）が{REGION}に上陸` | `第 {N} 號颱風（{NAME}）於{REGION}登陸` |
+| 発生 | `Typhoon No. {N} ({NAME}) has formed. Stay alert for its forecast track.` | `台風{N}号（{NAME}）が発生しました。今後の進路にご注意ください。` | `第 {N} 號颱風（{NAME}）已生成，請留意後續路徑預報。` |
+| 温低化 | `… has weakened into an extratropical cyclone.` | `…は温帯低気圧に変わりました。` | `…已減弱為溫帶氣旋。` |
+| 遠ざかる | `… has moved away from Taiwan and dissipated.` | `…は台湾から離れ、消滅しました。` | `…已遠離臺灣並消散。` |
+| タグ | `FORMED` / `DISSIPATED` | `発生` / `消滅` | `生成` / `消散` |
+| 地域 | `Northern/Central/Southern/Eastern Taiwan` | `台湾北部/中部/南部/東部` | `臺灣北部/中部/南部/東部` |
+| メニュー | `Data sources and licenses` | `出典とライセンス` | `資料來源與授權` |
+
+`REGION` はキー（`N` `C` `S` `E`）でゲーム側が保持し、**表示するときだけ**束が名前に直す。
+`region()` が英語名を返す設計だと、上陸後に言語を切り替えたとき文が混ざる。
+
+英語だけ `1 day` / `2 days` の単複を分ける（日本語・繁體中文には無い区別）。
 
 進路パターン名（内部識別子。UIには出ないが、コードとテストで使う）:
 `直進 → STRAIGHT` / `迷走 → ERRATIC` / `転向 → RECURVING` / `追尾 → TRACKING` / `停滞 → STALLING`
 
-地域名は §1b.5 の 4 種（`Northern` / `Central` / `Southern` / `Eastern Taiwan`）。
-
-**台風名: 140 個すべて創作に置き換える（ユーザー指示）。**
+### 7.5 台風名 — **140 個すべて創作**（ユーザー指示）
 
 元は気象庁アジア名のカタカナ 140 個。英語UIに合わせてローマ字化する方針だったが、
 出典 4 件（JMA / 台風委員会 / weathernews / Wikipedia）がすべて `EGRESS_BLOCKED` で
@@ -923,19 +995,20 @@ right   = north × p
 
 ```
 FORMED       Typhoon No. 12 (Wobbles) has formed. Stay alert for its forecast track.
-DISSIPATED   Typhoon No. 12 (Wobbles) has weakened into an extratropical cyclone.
-             Typhoon No. 67 (Aunt Hortensia) made landfall in Eastern Taiwan
+発生         台風12号（Wobbles）が発生しました。今後の進路にご注意ください。
+生成         第 12 號颱風（Wobbles）已生成，請留意後續路徑預報。
 ```
 
-だから**ニュース文・HUD・シェア文の書式は元のまま真面目に保つ**。名前だけがふざける。
+だから**ニュース文・HUD・シェア文の書式は 3 言語とも真面目に保つ**。名前だけがふざける。
 
-**必須の明示** — 実在リストと誤認されないよう、メニューに次の一文を出す:
+**必須の明示** — 実在リストと誤認されないよう、メニューに次の一文を出す（3 言語）:
 
 > Typhoon names in this game are entirely fictional and were made up for it.
 > They are not the official names assigned by the ESCAP/WMO Typhoon Committee.
 
 これに伴い、**元ゲームのメニューにあった気象庁リストへの帰属表示は削除する**（§3.1）。
 `names.js` は生成物ではなく**手書きのコンテンツ**なので、`tools/bake-names.mjs` は不要。
+`NAMES_DISCLAIMER` は `STRINGS.en.disclaimer` への別名にとどめ、同じ文を二か所に書かない。
 
 ---
 
@@ -961,13 +1034,14 @@ games/typhoon-escape/
     rules/
       config.js         # §1b.3 の換算表そのもの。**唯一の数値の置き場所**
       game.js           # スポーン・当たり判定・スコア（生存日数）・上陸地域
-      region.js         # §1b.5 の地域カスケード
+      region.js         # §1b.5 の地域カスケード（返すのはキー。表示名は i18n.js）
       names.js          # 台風名リスト（**創作・手書き**。生成物ではない）
+      i18n.js           # **画面に出る文字列の唯一の置き場所**（英 / 日 / 繁中）
     render/
       globe.js          # 海・陸・海岸線・大気
       stormview.js      # 渦・予報円・過去進路（§4.3 の表）
       camera.js         # 追従（画角はプレイ中固定）
-      hud.js            # 日付・ポップアップ・ティッカー・メニュー（英語）
+      hud.js            # 日付・生存日数・ポップアップ・ティッカー・メニュー（文言は受け取るだけ）
       input.js          # 仮想スティックとキーボード
     data/
       geo.js            # 生成物（コミットする・手で編集しない）
@@ -1004,14 +1078,15 @@ games/typhoon-escape/
 | `tessellate` | 分割の立体角合計が Chamberlain–Duquette 公式と 0.5% 以内で一致（全 4,013 ポリゴン、最悪 0.40%） / 陸地総面積が地球表面の 25–35% / 南極点が頂点として存在し三角形に覆われている / 日付変更線をまたぐポリゴンも面積が合う / 最長辺の沈み込みが 50 km 未満 / 極冠と赤道矩形が解析解と一致 |
 | `storm` | **5パターンの定数が §1.4 の表と完全一致**（回帰防止） / 予報円 `(fx,fy,fr)` が `timer` 秒後の実位置・実半径と一致する（元の `setForecast` と同じ意味を持つことの検査） / 成長・衰弱・寿命の遷移 / `t.ang` 更新式の角度ラップ |
 | `rules` | **速度逆転が t=10.0 日**（§1.6） / 発生間隔が t=31.25 日で 1.5 s に張り付く / 同時7個の上限 / 生存日数が `floor(elapsed)` / **§1b.1 の 3 つの無次元比が元の値と 1e-6 以内で一致** |
-| `region` | §1b.5 の **4 地域**すべてに本島頂点が存在する / 主要都市13点の分類が §1b.5 の表と一致 |
+| `region` | §1b.5 の **4 地域**すべてに本島頂点が存在する / 主要都市13点の分類が §1b.5 の表と一致 / 3 言語すべてに 4 地域の名前が揃い、互いに異なる |
+| `i18n` | 3 言語の束の**鍵と型が完全一致**（訳し漏れの検出） / 日本語・繁中の値が英語の使い回しでない / `src/` の文字列リテラルに CJK が無い / `index.html` の文言要素が空で出荷される / 日付書式が 3 言語で正しい（英語は月名 12 個が相異なる） / 生存日数の単複 / `pickLang` の言語判定 8 通り |
 | `calibrate` | `tools/calibrate.mjs` の出力と `rules/config.js` の値が一致する（**設計書と実装の乖離を検出する**） |
 | `push` | 経度バケット索引の内外判定が素朴な全辺走査と全点一致する（南極を含む） / 1フレームの判定辺数が 404×200 未満に収まる |
 | `deploy` | ビルド成果物に絶対パス参照がないこと / `_headers` が dist に入ること / Pages の 25 MiB・20,000 ファイル制限に収まること / **実ブラウザでサブディレクトリ配信して起動すること** / シェア URL が置いた場所になること |
 | `barrier` | 壁 43 個の構成 / 西へ押し続けても貫通しない / 壁沿いに南北へ滑る / 海の上では止まらない / 壁を外せば素通りできる / 判定 1 回が壁際 0.6 ms・外洋 0.02 ms 未満 |
 | `layering` | `src/world/**` と `src/render/**` のソースに `from "../rules` が現れないこと |
-| `play` | 実ブラウザで起動 → 操作 → 被弾 → ポップアップまで通る / WebGL コンテキストのエラーがない / 1500 ms のスローモーション後にポップアップが出る |
-| `mobile` | 縦画面・小画面でティッカーが増えてもスティックが押せる（`--rows` の持ち上げ） / HUD が重ならない |
+| `play` | 実ブラウザで起動 → 操作 → 被弾 → ポップアップまで通る / WebGL コンテキストのエラーがない / 1500 ms のスローモーション後にポップアップが出る / **HUD・敗北画面・シェア文の生存日数が `game.days` と一致** / 3 言語の切り替えが日付・上陸文・生存日数・ボタン・メニュー・速報タグまで届き、読み直しても残る |
+| `mobile` | 縦画面・小画面でティッカーが増えてもスティックが押せる（`--rows` の持ち上げ） / HUD が重ならない / 言語ボタン 3 つが画面内に収まり、開始ボタンと重ならない |
 
 `rules` の「無次元比の一致」検査が本設計の**移植の正しさを守る唯一の防波堤**である。
 定数をうっかり触ると即座に落ちる。
@@ -1032,10 +1107,21 @@ games/typhoon-escape/
 | 8 | `stormview.js` — 予報円・進路・渦 | 済 |
 | 9 | `hud.js` / シェア / 台風名 | 済 |
 | 10 | モバイル対応・`standalone` 化・テスト仕上げ | 済 |
+| 11 | 生存日数の表示（§1b.10）と 3 言語対応（§7） | 済 |
 
-**テスト 377 件がすべて通る**（Node 302 件 + 実ブラウザ 51 件 + モバイル 24 件）。
+**テスト 656 件がすべて通る**（Node 522 件 + 実ブラウザ 89 件 + モバイル 45 件）。
 
 ### 実装して分かった、設計書が間違っていたこと
+
+**致命半径を半分にしたとき、テストの仕掛けが道連れで壊れていた** — §1b.7 で
+`LETHAL` を 0.55 → 0.275 にしたが、`play` テストの「台風を本島の中心に置いて当てる」
+という仕掛けは `r=2.0` のままだった。致死半径 0.5500 度に対し、中心から最寄りの
+海岸線頂点は **0.5611 度**。**余裕が −0.0111 度** で、1 フレーム目には当たらない。
+当たるかどうかは台風がどちらへ流れるか（0.0835 度/フレーム）次第になり、
+この検査は以後ずっと**五分五分の賭け**だった（同じコードで成功と失敗の両方を実測）。
+定数を動かしたら、その定数に寄りかかっているテストの仕掛けも見直さないといけない。
+仕掛けを海岸線の頂点そのものへ移し（距離 0）、**仕掛け自体に余裕があることを
+テストの中で検算する**ようにした。同じ形の劣化が黙って戻ってくることはもう無い。
 
 いずれも**面積・角度の機械的な検算**で見つけた。目視では気付けなかった。
 

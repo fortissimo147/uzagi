@@ -44,6 +44,8 @@ not, so no attribution to that list is claimed or given.
 ## Original game
 
 This is a re-creation of `lovewcycle.com/games/others/typhoon-escape.html`, moved from a flat
-Mercator map to a 3D globe, with Taiwan in place of Japan and an English UI.
+Mercator map to a 3D globe, with Taiwan in place of Japan. The UI is available in
+English (default), Japanese and Traditional Chinese; see `DESIGN.md` §7, which also records
+which translated terms are sourced and which are unverified.
 The gameplay constants are ported from the original; how and why is written up in
 `DESIGN.md` §1 and §1b.

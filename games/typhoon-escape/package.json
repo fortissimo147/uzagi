@@ -9,10 +9,11 @@
     "preview": "vite preview",
     "bake:geo": "node tools/bake-geo.mjs",
     "calibrate": "node tools/calibrate.mjs",
-    "test": "node test/names.test.mjs && node test/sphere.test.mjs && node test/geo.test.mjs && node test/config.test.mjs && node test/storm.test.mjs && node test/region.test.mjs && node test/layering.test.mjs",
+    "test": "node test/names.test.mjs && node test/sphere.test.mjs && node test/geo.test.mjs && node test/tessellate.test.mjs && node test/config.test.mjs && node test/storm.test.mjs && node test/region.test.mjs && node test/layering.test.mjs",
     "standalone": "vite build && node tools/standalone.mjs"
   },
   "dependencies": {
+    "earcut": "^3.2.3",
     "three": "^0.180.0"
   },
   "devDependencies": {

@@ -4,3 +4,4 @@ dist
 
 __pycache__/
 games/typhoon-escape/node_modules
+games/typhoon-escape/dist

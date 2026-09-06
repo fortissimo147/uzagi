@@ -143,3 +143,43 @@ export function tangentFromBearing(p, ang, prevNorth = null) {
 
 /** 角度差を (-π, π] に畳む。元ゲームの atan2(sin d, cos d) と同じ。 */
 export const wrapAngle = (d) => Math.atan2(Math.sin(d), Math.cos(d));
+
+// ---- クォータニオン（陸塊の姿勢に使う。three.js を持ち込まないため自前） ----
+// [x, y, z, w]
+
+export const quatIdentity = () => [0, 0, 0, 1];
+
+export function quatFromAxisAngle(axis, rad, out = [0, 0, 0, 1]) {
+  const h = rad / 2;
+  const s = Math.sin(h);
+  const n = Math.hypot(axis[0], axis[1], axis[2]) || 1;
+  out[0] = (axis[0] / n) * s;
+  out[1] = (axis[1] / n) * s;
+  out[2] = (axis[2] / n) * s;
+  out[3] = Math.cos(h);
+  return out;
+}
+
+/** a を先に、b を後に適用する合成（= b * a）。 */
+export function quatMul(b, a, out = [0, 0, 0, 1]) {
+  const [ax, ay, az, aw] = a;
+  const [bx, by, bz, bw] = b;
+  out[0] = bw * ax + bx * aw + by * az - bz * ay;
+  out[1] = bw * ay - bx * az + by * aw + bz * ax;
+  out[2] = bw * az + bx * ay - by * ax + bz * aw;
+  out[3] = bw * aw - bx * ax - by * ay - bz * az;
+  return out;
+}
+
+export const quatConj = (q) => [-q[0], -q[1], -q[2], q[3]];
+
+export function quatApply(q, v, out = [0, 0, 0]) {
+  const [x, y, z, w] = q;
+  const tx = 2 * (y * v[2] - z * v[1]);
+  const ty = 2 * (z * v[0] - x * v[2]);
+  const tz = 2 * (x * v[1] - y * v[0]);
+  out[0] = v[0] + w * tx + (y * tz - z * ty);
+  out[1] = v[1] + w * ty + (z * tx - x * tz);
+  out[2] = v[2] + w * tz + (x * ty - y * tx);
+  return out;
+}

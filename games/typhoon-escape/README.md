@@ -52,10 +52,20 @@ npm run deploy      # games/typhoon-escape/ で実行
 
 | 項目 | 値 |
 | --- | --- |
-| Root directory | `games/typhoon-escape` **[推定: ダッシュボードの項目名は要確認]** |
+| Project name | `typhoon-escape` |
+| Production branch | `games/typhoon-escape` を含むブランチ |
 | Framework preset | None |
+| **Root directory (advanced)** | **`games/typhoon-escape`** ← これを入れ忘れると別のゲームが公開される |
 | Build command | `npm run build` |
 | Build output directory | `dist` |
+
+**Root directory は必須**。空のままだとリポジトリのルートでビルドが走り、
+ルートの `npm run build`（Tower of Green Pillars）の成果物が公開されてしまう。
+
+この設定でビルドが通ることは、`games/typhoon-escape/` だけを取り出した
+まっさらなチェックアウトで `npm ci && npm run build` を実行し、
+できた `dist/` を配って実ブラウザで起動するところまで確認してある
+（陸 4,013 ポリゴン・JS エラー 0）。ルート側の `node_modules` には依存していない。
 
 ### B. 既存の `uzagi` にぶら下げる
 

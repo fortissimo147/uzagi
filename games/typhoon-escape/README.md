@@ -17,7 +17,7 @@ npm i
 npm run dev        # 開発サーバ
 npm run build      # dist/ を作る
 npm run standalone # dist/typhoon-escape.html（1 枚完結・約 2.8 MiB）
-npm test           # 全テスト（Node + 実ブラウザ）
+npm test           # 全テスト 297 件（Node 234 / 実ブラウザ 39 / モバイル 24）
 ```
 
 ## 配信（Cloudflare Pages）

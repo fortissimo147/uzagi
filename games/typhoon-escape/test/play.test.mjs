@@ -1,16 +1,27 @@
 // 実ブラウザでの通しテスト。既存リポジトリと同じ playwright-core + 同梱 Chromium。
 import { chromium } from "playwright-core";
 import { spawn } from "node:child_process";
+import { join } from "node:path";
+
+// npx 経由で起こすと vite が孫プロセスになり、こちらを kill しても残る。
+// 残ったサーバがポートを掴んだままになり、次の実行が固まる（実際に起きた）。
+// 直接叩いて親子関係を 1 段にする。
+const VITE = join(process.cwd(), "node_modules", ".bin", "vite");
 import { check, section, summary } from "./harness.mjs";
 
 const PORT = 4100 + Math.floor(Math.random() * 800);
 const URL = `http://127.0.0.1:${PORT}/`;
 
 function serve() {
-  const p = spawn("npx", ["vite", "preview", "--port", String(PORT), "--strictPort"], {
+  const p = spawn(VITE, ["preview", "--port", String(PORT), "--strictPort"], {
     stdio: ["ignore", "pipe", "pipe"],
     env: process.env,
   });
+  // テストが途中で殺されてもサーバを残さない。残すと次回がポートを掴めず固まる。
+  const bye = () => p.kill("SIGKILL");
+  process.on("exit", bye);
+  process.on("SIGINT", bye);
+  process.on("SIGTERM", bye);
   return new Promise((res, rej) => {
     const t = setTimeout(() => rej(new Error("preview サーバが起動しない")), 30000);
     p.stdout.on("data", (d) => {

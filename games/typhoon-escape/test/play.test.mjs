@@ -238,20 +238,37 @@ await page.waitForTimeout(6000); // ソフトウェア描画だと数 fps しか
   }));
   check(`台風 ${d.storms} 個で CPU 側 1 フレームが 8 ms 未満（実測 ${d.cpu.toFixed(2)} ms）`, d.cpu < 8);
   check(`台風 7 個でもドローコールが 40 未満（${d.calls}）`, d.calls < 40);
+}
 {
   // イントロの 90 度から寄ってくる。ソフトウェア描画では数 fps しか出ず
   // 収束に実時間がかかるので、壁時計で待たずに収束そのものを待つ。
   let ok = true;
   try {
-    await page.waitForFunction(() => window.__game.follow.visible <= window.__game.cfg.CAM_PLAY * 1.02, null, { timeout: 40000 });
+    await page.waitForFunction(() => Math.abs(window.__game.follow.visible - window.__game.cfg.CAM_PLAY) < 0.05, null, { timeout: 40000 });
   } catch {
     ok = false;
   }
   const v = await page.evaluate(() => window.__game.follow.visible);
-  const floor = await page.evaluate(() => window.__game.cfg.CAM_FLOOR);
-  check(`プレイ中は PLAY 画角より引かない（${v.toFixed(2)} 度）`, ok && v >= floor * 0.99);
+  check(`プレイ中の画角は常に PLAY（${v.toFixed(3)} 度）`, ok);
 }
+{
+  // 台風を本島のすぐ隣に寄せても、画角が狭くならないこと（自動ズームインの廃止）
+  const z = await page.evaluate(async () => {
+    const g = window.__game.game;
+    const f = window.__game.follow;
+    const before = f.visible;
+    for (const st of g.storms) {
+      st.p = [...g.pos];
+      st.r = 1.5;
+    }
+    await new Promise((r) => setTimeout(r, 1500));
+    return { before, after: f.visible, play: window.__game.cfg.CAM_PLAY, storms: g.storms.length };
+  });
+  check(`台風が真上に来ても画角が変わらない（${z.before.toFixed(3)} → ${z.after.toFixed(3)} / PLAY ${z.play.toFixed(3)}）`,
+    Math.abs(z.after - z.play) < 0.05);
+  check("見える範囲が狭くならない", z.after >= z.play - 1e-6);
 }
+
 // 元に戻す
 await page.evaluate(() => {
   const g = window.__game.game;

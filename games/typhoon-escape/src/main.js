@@ -152,9 +152,9 @@ class App {
     } else {
       // イントロの寄りは演出なので実時間で進める（dt の頭打ちに引きずられない）
       this.introT = Math.min(1, this.introT + wall / 3);
-      // プレイ中は PLAY より引かない（元より広く見えると難度が下がって別ゲームになる）
-      const framed = Math.min(CFG.CAM_PLAY, this.follow.frameFor(g.pos, g.storms, CFG, g.tsp));
-      want = CFG.CAM_WORLD + (framed - CFG.CAM_WORLD) * this.introT;
+      // 開始時に地球全体からプレイ画角へ寄るのは 1 回だけ。
+      // それ以降は **常に CAM_PLAY のまま**で、状況によって寄ったり引いたりしない。
+      want = CFG.CAM_WORLD + (CFG.CAM_PLAY - CFG.CAM_WORLD) * this.introT;
     }
     // カメラの追従も演出なので実時間で。dt の頭打ちに引きずられると寄りが遅れる。
     this.follow.update(g.pos, want, wall, this.snapCam);

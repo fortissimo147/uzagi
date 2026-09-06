@@ -43,7 +43,7 @@ near("台風速度 t=0 = 1.6695 度/秒", CFG.STORM_SPD0, 1.6695, 1e-4);
 near("プレイ窓 幅 = 10.6003 度", CFG.PLAY_W, 10.6003, 1e-4);
 near("プレイ窓 高 = 18.5505 度", CFG.PLAY_H, 18.5505, 1e-4);
 near("カメラ PLAY 可視角半径 = 12.0579 度（元の窓 × VIEW_SCALE 1.3）", CFG.CAM_PLAY, 12.0579, 1e-4);
-near("カメラ FLOOR 可視角半径 = 6.0290 度（PLAY の半分）", CFG.CAM_FLOOR, 6.029, 1e-4);
+near("カメラ FLOOR = PLAY（プレイ中はズームインしない）", CFG.CAM_FLOOR, CFG.CAM_PLAY, 1e-12);
 
 // --- §1.6 の難度曲線 ---
 section("難度曲線（§1.6）");
@@ -97,7 +97,7 @@ section("画角（§5.2b）");
 near("VIEW_SCALE は 1.3", CFG.VIEW_SCALE, 1.3, 1e-12);
 near("プレイ窓の縦横比は元ゲームの 400:700", CFG.WINDOW_ASPECT, 400 / 700, 1e-12);
 near("VIEW_SCALE=1 なら元の窓の縦半分に一致", (CFG.PLAY_H / 2) * 1, 9.2753, 1e-4);
-check("FLOOR は PLAY の半分", Math.abs(CFG.CAM_FLOOR * 2 - CFG.CAM_PLAY) < 1e-12);
+check("FLOOR と PLAY が一致する＝プレイ中に画角が狭くならない", CFG.CAM_FLOOR === CFG.CAM_PLAY);
 check("PLAY は WORLD より狭い", CFG.CAM_PLAY < CFG.CAM_WORLD);
 
 summary("config");

@@ -104,8 +104,12 @@ export const CFG = {
   get CAM_PLAY() {
     return (this.PLAY_H / 2) * this.VIEW_SCALE;
   },
+  /**
+   * 画角の下限。**CAM_PLAY と同じ**にしてある。
+   * つまりプレイ中は一切ズームインしない。数値ではなく構造で保証するために残す。
+   */
   get CAM_FLOOR() {
-    return this.CAM_PLAY / 2;
+    return this.CAM_PLAY;
   },
   CAM_WORLD: 90,
   CAM_SMOOTH: 4, // 1 - exp(-k dt)

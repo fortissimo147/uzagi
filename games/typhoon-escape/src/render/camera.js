@@ -92,7 +92,11 @@ export class FollowCamera {
     // ここでの上限は WORLD（地球全体）。「プレイ中は PLAY より広げない」という
     // 難度側の制約は呼び出し側で掛ける。ここで PLAY に丸めると、
     // タイトルとイントロで地球全体を見せられなくなる。
-    this.visibleTarget = Math.max(this.cfg.CAM_FLOOR, Math.min(this.cfg.CAM_WORLD, want));
+    // **PLAY より寄らない。** 下限は CAM_PLAY で、構造として寄れないようにしてある。
+    // 以前は台風が近いと自動で寄る仕掛けを入れていたが、
+    // 「勝手にズームインして見える範囲が狭くなる」のは望ましくない（ユーザー指摘）。
+    // 元ゲームもビューポートは固定だったので、こちらのほうが忠実でもある。
+    this.visibleTarget = Math.max(this.cfg.CAM_PLAY, Math.min(this.cfg.CAM_WORLD, want));
     if (snap) {
       this.q.copy(this.target);
       this.visible = this.visibleTarget;
@@ -112,26 +116,5 @@ export class FollowCamera {
     this.cam.near = Math.max(0.001, d - R * 1.2);
     this.cam.far = d + R * 1.2;
     this.cam.updateProjectionMatrix();
-  }
-
-  /**
-   * 自動フレーミング（§5.2）。
-   * 「最も危険な台風」＝ (角距離 - 致死半径) / 速度 が最小の個体を選び、
-   * それとプレイヤーの両方が入る最小の画角を返す。
-   */
-  frameFor(pos, storms, cfg, tsp) {
-    let best = null;
-    let bestT = Infinity;
-    for (const st of storms) {
-      const d = S.angleDeg(pos, st.p);
-      const v = Math.max(1e-6, st.stalled ? tsp * cfg.STALL_FACTOR : tsp * st.spd);
-      const t = (d - st.r * cfg.LETHAL) / v;
-      if (t < bestT) {
-        bestT = t;
-        best = { d, r: st.r };
-      }
-    }
-    if (!best) return cfg.CAM_PLAY;
-    return best.d + best.r + cfg.BODY_DEG * 1.5;
   }
 }

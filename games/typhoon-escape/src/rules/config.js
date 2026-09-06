@@ -16,6 +16,15 @@ export const ORIG = {
   LETHAL: 0.55, // 致死半径 / 外側半径
 };
 
+/**
+ * 致死半径の倍率（本作の選択）。**元ゲームの半分**。
+ *
+ * 元は外側の 0.55 倍。本作は 0.275 倍にした（ユーザー指定）。
+ * これは §1b.1 の「比を保存する」方針からの**意図的な逸脱**である。
+ * 面積で見ると当たる的が 1/4 になるので、元より明確に易しい。§1b.7
+ */
+export const LETHAL_SCALE = 0.5;
+
 /** 本作の設計選択。 */
 export const RHO_TW = 1.857748022; // 台湾本島(10m・閉じ点を除く 403 頂点)の真の外接角半径[度] — 実測
 export const K_TW = 1.0; // 描画倍率。実寸。難度には影響しない（§1b.2 の注意書き）
@@ -44,7 +53,7 @@ export const CFG = {
   R_PEAK_MIN: px(ORIG.M * 0.05),
   R_PEAK_RAND: px(ORIG.M * 0.035),
   R_DIE: px(ORIG.M * 0.012),
-  LETHAL: ORIG.LETHAL,
+  LETHAL: ORIG.LETHAL * LETHAL_SCALE,
   GROW_T_MIN: 3,
   GROW_T_RAND: 3,
   DECAY_RATE: 0.12, // rPeak あたり毎秒

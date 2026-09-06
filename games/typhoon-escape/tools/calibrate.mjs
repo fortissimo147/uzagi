@@ -204,6 +204,12 @@ for (const t of [0, 10, 30, 60]) {
   console.log(`  台風 t=${String(t).padStart(2)}日: ${f(s)}°/s = ${f(km(s) / 24, 2)} km/h  (対プレイヤー ${f(s / spd, 2)}倍)`);
 }
 console.log(`速度逆転 t = ${f((0.125 - 0.09) / 0.0035, 2)} ゲーム内日`);
+// 本作は致死半径だけを意図的に半分にしている（§1b.7）。上の表は元ゲームの比のまま。
+const LETHAL_SCALE = 0.5;
+console.log(`\n本作の致死半径（元の ${f(LETHAL_SCALE, 2)} 倍・§1b.7）:`);
+console.log(`  ピーク最小 ${f(M * 0.05 * ORIG.lethal * LETHAL_SCALE * A)}° = ${f(km(M * 0.05 * ORIG.lethal * LETHAL_SCALE * A), 1)} km`);
+console.log(`  ピーク最大 ${f((M * 0.05 + M * 0.035) * ORIG.lethal * LETHAL_SCALE * A)}° = ${f(km((M * 0.05 + M * 0.035) * ORIG.lethal * LETHAL_SCALE * A), 1)} km`);
+console.log(`  当たる的の面積は元の ${f(LETHAL_SCALE ** 2, 2)} 倍`);
 console.log(`半球横断 ${f(180 / spd, 1)} 日 / 赤道一周 ${f(360 / spd, 1)} 日`);
 
 // ================= 無次元比の保存 =================

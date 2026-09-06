@@ -1,5 +1,5 @@
 import { check, near, section, summary } from "./harness.mjs";
-import { CFG, ORIG, PATTERNS, BODY_PX, BODY_DEG, A, K_TW } from "../src/rules/config.js";
+import { CFG, ORIG, PATTERNS, BODY_PX, BODY_DEG, A, K_TW, LETHAL_SCALE } from "../src/rules/config.js";
 
 section("換算表（DESIGN.md §1b）");
 
@@ -8,8 +8,10 @@ section("換算表（DESIGN.md §1b）");
 section("無次元比の保存 — 元ゲームと同一であること");
 const M = ORIG.M;
 const pairs = [
-  ["致死半径(ピーク最大)/自国外接半径", ((M * 0.05 + M * 0.035) * ORIG.LETHAL) / BODY_PX, (CFG.R_PEAK_MIN + CFG.R_PEAK_RAND) * CFG.LETHAL / BODY_DEG],
-  ["致死半径(ピーク最小)/自国外接半径", (M * 0.05 * ORIG.LETHAL) / BODY_PX, (CFG.R_PEAK_MIN * CFG.LETHAL) / BODY_DEG],
+  // 致死半径だけは **意図的に元の半分**にしている（§1b.7）。
+  // 素の比を比べると当然ずれるので、LETHAL_SCALE で割り戻してから照合する。
+  ["致死半径(ピーク最大)/自国外接半径", ((M * 0.05 + M * 0.035) * ORIG.LETHAL) / BODY_PX, ((CFG.R_PEAK_MIN + CFG.R_PEAK_RAND) * CFG.LETHAL) / BODY_DEG / LETHAL_SCALE],
+  ["致死半径(ピーク最小)/自国外接半径", (M * 0.05 * ORIG.LETHAL) / BODY_PX, (CFG.R_PEAK_MIN * CFG.LETHAL) / BODY_DEG / LETHAL_SCALE],
   ["初期半径/自国外接半径", (M * 0.015) / BODY_PX, CFG.R_INIT / BODY_DEG],
   ["消滅しきい値/自国外接半径", (M * 0.012) / BODY_PX, CFG.R_DIE / BODY_DEG],
   ["プレイヤー速度/自国外接半径", (M * 0.125) / BODY_PX, CFG.PLAYER_SPD / BODY_DEG],
@@ -34,8 +36,8 @@ section("§1b.3 の換算値");
 near("A = 0.026501 度/元px", A, 0.026501, 1e-6);
 near("自国の描画外接角半径 = 1.8577 度", BODY_DEG, 1.8577, 1e-4);
 check("K_TW = 1.0（実寸）", K_TW === 1.0);
-near("致死半径ピーク最大 = 0.8672 度", (CFG.R_PEAK_MIN + CFG.R_PEAK_RAND) * CFG.LETHAL, 0.8672, 1e-4);
-near("致死半径ピーク最小 = 0.5101 度", CFG.R_PEAK_MIN * CFG.LETHAL, 0.5101, 1e-4);
+near("致死半径ピーク最大 = 0.4336 度（元 0.8672 の半分）", (CFG.R_PEAK_MIN + CFG.R_PEAK_RAND) * CFG.LETHAL, 0.4336, 1e-4);
+near("致死半径ピーク最小 = 0.2551 度（元 0.5101 の半分）", CFG.R_PEAK_MIN * CFG.LETHAL, 0.2551, 1e-4);
 near("プレイヤー速度 = 2.3188 度/秒", CFG.PLAYER_SPD, 2.3188, 1e-4);
 near("台風速度 t=0 = 1.6695 度/秒", CFG.STORM_SPD0, 1.6695, 1e-4);
 near("プレイ窓 幅 = 10.6003 度", CFG.PLAY_W, 10.6003, 1e-4);
@@ -78,6 +80,17 @@ section("元のまま維持すると決めた値");
 check("開始日は 2026-08-01", CFG.START_DATE.join(",") === "2026,7,1");
 check("スローモーションは 0.3 倍・1500 ms", CFG.SLOWMO === 0.3 && CFG.SLOWMO_MS === 1500);
 check("dt の上限は 50 ms", CFG.DT_MAX === 0.05);
-check("致死半径は外側の 0.55 倍", CFG.LETHAL === 0.55);
+check("元ゲームの致死半径は外側の 0.55 倍（事実として保持）", ORIG.LETHAL === 0.55);
+
+section("致死半径の意図的な半減（§1b.7）");
+check("元の値は 0.55 のまま残っている", ORIG.LETHAL === 0.55);
+check("倍率は 0.5", LETHAL_SCALE === 0.5);
+near("本作の致死半径は外側の 0.275 倍", CFG.LETHAL, 0.275, 1e-12);
+near("元のちょうど半分", CFG.LETHAL / ORIG.LETHAL, 0.5, 1e-12);
+near("当たる的の面積は元の 1/4", (CFG.LETHAL / ORIG.LETHAL) ** 2, 0.25, 1e-12);
+check("致死半径は外側半径より小さい", CFG.LETHAL < 1);
+check("致死半径は眼より大きい（眼が判定からはみ出さない）", CFG.LETHAL > CFG.EYE, `致死 ${CFG.LETHAL} / 眼 ${CFG.EYE}`);
+near("致死円/自国外接半径 は元の 0.4668 の半分 = 0.2334",
+  ((CFG.R_PEAK_MIN + CFG.R_PEAK_RAND) * CFG.LETHAL) / BODY_DEG, 0.2334, 1e-3);
 
 summary("config");

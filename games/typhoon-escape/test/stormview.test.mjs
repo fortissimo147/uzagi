@@ -80,8 +80,8 @@ section("南北で巻きの向きが逆になること");
 
 section("見た目と当たり判定の一致（§4.3 の約束）");
 {
-  // 致死半径は外側の 0.55 倍。渦の飾りはこの値に一切影響しない。
-  near("致死半径 = 外側 × 0.55", rDeg * CFG.LETHAL, rDeg * 0.55, 1e-12);
+  // 致死半径は外側の 0.275 倍（元の半分・§1b.7）。渦の飾りはこの値に一切影響しない。
+  near("致死半径 = 外側 × 0.275", rDeg * CFG.LETHAL, rDeg * 0.275, 1e-12);
   const inner = spiralArms(c, rDeg * CFG.LETHAL, 0, 1, CFG);
   check("小さい台風でも腕は生成できる（半径に比例するだけ）", inner.length === arms.length);
 }
